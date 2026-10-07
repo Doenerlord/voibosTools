@@ -31,7 +31,7 @@ describe("addons/voibosTools/components/HoehenService.vue", () => {
             })
         };
 
-        sinon.stub(mapCollection, "getMap").callsFake(mode => (mode === "2D" ? mockMap : null));
+        sinon.stub(mapCollection, "getMap").callsFake(mode => mode === "2D" ? mockMap : null);
         fetchElevationStub = sinon.stub(voibosApi, "fetchElevation");
         transformStub = sinon.stub(coordinateService, "transform").callsFake((coord) => coord);
     });
@@ -98,6 +98,7 @@ describe("addons/voibosTools/components/HoehenService.vue", () => {
 
         // Marker added to source
         expect(wrapper.vm.vectorSource.getFeatures()).to.have.lengthOf(1);
+        expect(transformStub.calledOnce).to.be.true;
         expect(fetchElevationStub.calledOnce).to.be.true;
 
         // Verify result rendered

@@ -171,7 +171,7 @@ export default {
 
         /**
          * Creates styled marker with high contrast.
-         * @returns {Array<module:ol/style/Style>}
+         * @returns {Array<module:ol/style/Style>} Marker style array.
          */
         createMarkerStyle () {
             return [
@@ -264,7 +264,7 @@ export default {
          * Formats a number with locale digits.
          * @param {Number|String} val
          * @param {Number} [decimals=1]
-         * @returns {String}
+         * @returns {String} Formatted number string.
          */
         formatNumber (val, decimals = 1) {
             if (typeof val === "number") {
@@ -280,10 +280,19 @@ export default {
 </script>
 
 <template>
-    <div id="voibos-hoehenservice" class="voibos-hoehenservice p-1">
+    <div
+        id="voibos-hoehenservice"
+        class="voibos-hoehenservice p-1"
+    >
         <!-- Active Hint / Instruction -->
-        <div class="alert alert-primary d-flex align-items-center mb-3 py-2 px-3" role="status">
-            <i class="bi bi-cursor-fill me-2 fs-5" aria-hidden="true" />
+        <div
+            class="alert alert-primary d-flex align-items-center mb-3 py-2 px-3"
+            role="status"
+        >
+            <i
+                class="bi bi-cursor-fill me-2 fs-5"
+                aria-hidden="true"
+            />
             <div class="small">
                 <strong>{{ $t("additional:modules.tools.voibosTools.elevation.activeHint") }}</strong>
             </div>
@@ -294,7 +303,10 @@ export default {
             v-if="isLoading"
             class="d-flex flex-column align-items-center justify-content-center p-4 my-2"
         >
-            <div class="spinner-border text-primary mb-2" role="status">
+            <div
+                class="spinner-border text-primary mb-2"
+                role="status"
+            >
                 <span class="visually-hidden">Loading...</span>
             </div>
             <div class="text-muted small">
@@ -308,14 +320,20 @@ export default {
             class="alert alert-warning d-flex align-items-start mb-3"
             role="alert"
         >
-            <i class="bi bi-exclamation-triangle-fill me-2 mt-1 fs-5" aria-hidden="true" />
+            <i
+                class="bi bi-exclamation-triangle-fill me-2 mt-1 fs-5"
+                aria-hidden="true"
+            />
             <div class="small">
                 {{ errorMessage }}
             </div>
         </div>
 
         <!-- Result Display -->
-        <div v-if="elevationData && !isLoading" class="elevation-result-container">
+        <div
+            v-if="elevationData && !isLoading"
+            class="elevation-result-container"
+        >
             <!-- Main Elevation Card -->
             <div class="card shadow-sm mb-3 border-0 bg-light">
                 <div class="card-body p-3">
@@ -357,7 +375,10 @@ export default {
             <div class="card shadow-sm mb-3 border-0">
                 <div class="card-body p-3">
                     <h6 class="card-title d-flex align-items-center mb-2 fs-6">
-                        <i class="bi bi-geo-alt me-2 text-primary" aria-hidden="true" />
+                        <i
+                            class="bi bi-geo-alt me-2 text-primary"
+                            aria-hidden="true"
+                        />
                         {{ $t("additional:modules.tools.voibosTools.elevation.coordinatesTitle") }}
                     </h6>
                     <div class="row g-2 small">
@@ -420,7 +441,10 @@ export default {
                             {{ elevationData.datengrundlage }}
                         </span>
                     </div>
-                    <div v-if="elevationData.flugjahr && elevationData.flugjahr !== 'n/a'" class="d-flex justify-content-between">
+                    <div
+                        v-if="elevationData.flugjahr && elevationData.flugjahr !== 'n/a'"
+                        class="d-flex justify-content-between"
+                    >
                         <span>{{ $t("additional:modules.tools.voibosTools.elevation.flightYear") }}:</span>
                         <span class="fw-semibold text-dark">
                             {{ elevationData.flugjahr }}
@@ -436,7 +460,10 @@ export default {
                     class="btn btn-outline-secondary btn-sm"
                     @click="reset"
                 >
-                    <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true" />
+                    <i
+                        class="bi bi-arrow-counterclockwise me-1"
+                        aria-hidden="true"
+                    />
                     {{ $t("additional:modules.tools.voibosTools.elevation.reset") }}
                 </button>
             </div>
@@ -447,7 +474,10 @@ export default {
             v-if="!elevationData && !isLoading && !errorMessage"
             class="text-center text-muted p-4 my-3 border rounded bg-light"
         >
-            <i class="bi bi-geo-alt fs-1 text-secondary d-block mb-2" aria-hidden="true" />
+            <i
+                class="bi bi-geo-alt fs-1 text-secondary d-block mb-2"
+                aria-hidden="true"
+            />
             <p class="mb-0 small">
                 {{ $t("additional:modules.tools.voibosTools.elevation.instruction") }}
             </p>

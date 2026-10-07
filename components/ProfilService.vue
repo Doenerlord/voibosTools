@@ -9,16 +9,28 @@ export default {
 </script>
 
 <template>
-    <div id="voibos-profilservice" class="voibos-subtool p-2">
+    <div
+        id="voibos-profilservice"
+        class="voibos-subtool p-2"
+    >
         <h5 class="mb-3">
-            <i class="bi bi-graph-up me-2" aria-hidden="true" />
+            <i
+                class="bi bi-graph-up me-2"
+                aria-hidden="true"
+            />
             {{ $t("additional:modules.tools.voibosTools.profile.title") }}
         </h5>
         <p class="text-muted">
             {{ $t("additional:modules.tools.voibosTools.profile.description") }}
         </p>
-        <div class="alert alert-info d-flex align-items-center" role="alert">
-            <i class="bi bi-info-circle-fill me-2" aria-hidden="true" />
+        <div
+            class="alert alert-info d-flex align-items-center"
+            role="alert"
+        >
+            <i
+                class="bi bi-info-circle-fill me-2"
+                aria-hidden="true"
+            />
             <div>
                 {{ $t("additional:modules.tools.voibosTools.profile.status") }}
             </div>

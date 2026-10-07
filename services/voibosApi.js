@@ -16,7 +16,7 @@ class VoibosApi {
         this.timeout = options.timeout || 15000;
         this.headers = {
             "Accept": "application/json",
-            ...(options.headers || {})
+            ...options.headers || {}
         };
     }
 
@@ -65,7 +65,7 @@ class VoibosApi {
             method,
             headers: {
                 ...this.headers,
-                ...(config.headers || {})
+                ...config.headers || {}
             },
             signal: controller.signal
         };
@@ -122,7 +122,7 @@ class VoibosApi {
      * Unified GET request.
      * @param {String} [endpoint=""] API endpoint.
      * @param {Object} [params] Query parameters.
-     * @returns {Promise<any>}
+     * @returns {Promise<any>} Response data.
      */
     get (endpoint = "", params = {}) {
         return this.request(endpoint, {method: "GET", params});
@@ -133,7 +133,7 @@ class VoibosApi {
      * @param {String} [endpoint=""] API endpoint.
      * @param {Object} [body] Request payload.
      * @param {Object} [params] Query parameters.
-     * @returns {Promise<any>}
+     * @returns {Promise<any>} Response data.
      */
     post (endpoint = "", body = {}, params = {}) {
         return this.request(endpoint, {method: "POST", body, params});
@@ -261,15 +261,19 @@ class VoibosApi {
             sunPath = response.horizont.filter(h => h.hoehenwinkelAbfragedatum !== "n/a"),
             aboveHorizon = sunPath.filter(h => Number(h.hoehenwinkelAbfragedatum) > 0);
 
-        // Helper to convert "HH:mm" to minutes from midnight
-        const parseMinutes = (str) => {
+        /**
+         * Converts "HH:mm" to minutes from midnight.
+         * @param {String} str Time string.
+         * @returns {Number|null} Minutes from midnight or null.
+         */
+        function parseMinutes (str) {
             if (!str || str === "n/a") {
                 return null;
             }
             const [h, m] = str.split(":").map(Number);
 
             return isNaN(h) || isNaN(m) ? null : h * 60 + m;
-        };
+        }
 
         const targetMinutes = parseMinutes(targetTime) ?? 12 * 60;
 
@@ -366,19 +370,17 @@ class VoibosApi {
 
     /**
      * 3. Profilservice (Höhenprofil)
-     * @param {Object} _params Query parameters for profile service.
-     * @returns {Promise<Object>}
+     * @returns {Promise<Object>} Response containing profile points.
      */
-    async fetchProfile (_params) {
+    async fetchProfile () {
         throw new Error("VoibosApi.fetchProfile: Implementation planned for Milestone 3");
     }
 
     /**
      * 4. Wegzeit (Multi-Punkt-Wegzeitberechnung)
-     * @param {Object} _params Query parameters for travel time service.
-     * @returns {Promise<Object>}
+     * @returns {Promise<Object>} Response containing travel time details.
      */
-    async fetchTravelTime (_params) {
+    async fetchTravelTime () {
         throw new Error("VoibosApi.fetchTravelTime: Implementation planned for Milestone 4");
     }
 }

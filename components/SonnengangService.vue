@@ -17,11 +17,11 @@ export default {
     name: "SonnengangService",
     data () {
         const now = new Date(),
-            year = now.getFullYear(),
-            month = String(now.getMonth() + 1).padStart(2, "0"),
-            day = String(now.getDate()).padStart(2, "0"),
-            hours = String(now.getHours()).padStart(2, "0"),
-            minutes = String(now.getMinutes()).padStart(2, "0");
+              year = now.getFullYear(),
+              month = String(now.getMonth() + 1).padStart(2, "0"),
+              day = String(now.getDate()).padStart(2, "0"),
+              hours = String(now.getHours()).padStart(2, "0"),
+              minutes = String(now.getMinutes()).padStart(2, "0");
 
         return {
             map: null,
@@ -46,15 +46,15 @@ export default {
     computed: {
         /**
          * Checks if Daylight Saving Time (MESZ) applies for the selected date.
-         * @returns {Boolean}
+         * @returns {Boolean} True if daylight saving time applies.
          */
         isDaylightSavingTime () {
             if (!this.selectedDate) {
                 return true;
             }
             const dateObj = new Date(this.selectedDate),
-                janOffset = new Date(dateObj.getFullYear(), 0, 1).getTimezoneOffset(),
-                julOffset = new Date(dateObj.getFullYear(), 6, 1).getTimezoneOffset();
+                  janOffset = new Date(dateObj.getFullYear(), 0, 1).getTimezoneOffset(),
+                  julOffset = new Date(dateObj.getFullYear(), 6, 1).getTimezoneOffset();
 
             return dateObj.getTimezoneOffset() < Math.max(janOffset, julOffset);
         }
@@ -201,7 +201,7 @@ export default {
 
         /**
          * Marker style with sun / gold accent.
-         * @returns {Array<module:ol/style/Style>}
+         * @returns {Array<module:ol/style/Style>} Marker styles array.
          */
         createMarkerStyle () {
             return [
@@ -271,14 +271,14 @@ export default {
         /**
          * Converts azimuth degrees into cardinal direction string.
          * @param {Number} azimuth
-         * @returns {String}
+         * @returns {String} Cardinal direction.
          */
         getCompassDirection (azimuth) {
             if (typeof azimuth !== "number" || isNaN(azimuth)) {
                 return "";
             }
             const directions = ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"],
-                index = Math.round(azimuth / 22.5) % 16;
+                  index = Math.round(azimuth / 22.5) % 16;
 
             return directions[index];
         },
@@ -301,7 +301,7 @@ export default {
          * Formats a number with locale digits.
          * @param {Number|String} val
          * @param {Number} [decimals=1]
-         * @returns {String}
+         * @returns {String} Formatted number string.
          */
         formatNumber (val, decimals = 1) {
             if (typeof val === "number") {
@@ -317,15 +317,24 @@ export default {
 </script>
 
 <template>
-    <div id="voibos-sonnengang" class="voibos-sonnengang p-1">
+    <div
+        id="voibos-sonnengang"
+        class="voibos-sonnengang p-1"
+    >
         <!-- Date and Time Picker Card -->
         <div class="card shadow-sm mb-3 border-0 bg-light">
             <div class="card-body p-3">
                 <div class="row g-2 mb-2">
                     <!-- Date input -->
                     <div class="col-7">
-                        <label for="sonnengang-date" class="form-label small text-muted mb-1">
-                            <i class="bi bi-calendar3 me-1" aria-hidden="true" />
+                        <label
+                            for="sonnengang-date"
+                            class="form-label small text-muted mb-1"
+                        >
+                            <i
+                                class="bi bi-calendar3 me-1"
+                                aria-hidden="true"
+                            />
                             {{ $t("additional:modules.tools.voibosTools.sun.dateLabel") }}
                         </label>
                         <input
@@ -339,8 +348,14 @@ export default {
 
                     <!-- Time input -->
                     <div class="col-5">
-                        <label for="sonnengang-time" class="form-label small text-muted mb-1">
-                            <i class="bi bi-clock me-1" aria-hidden="true" />
+                        <label
+                            for="sonnengang-time"
+                            class="form-label small text-muted mb-1"
+                        >
+                            <i
+                                class="bi bi-clock me-1"
+                                aria-hidden="true"
+                            />
                             {{ $t("additional:modules.tools.voibosTools.sun.timeLabel") }}
                         </label>
                         <input
@@ -361,7 +376,10 @@ export default {
                         :class="isPickingLocation ? 'btn-primary' : 'btn-outline-primary'"
                         @click="activateLocationPicking"
                     >
-                        <i class="bi bi-geo-alt-fill me-1" aria-hidden="true" />
+                        <i
+                            class="bi bi-geo-alt-fill me-1"
+                            aria-hidden="true"
+                        />
                         {{ isPickingLocation && !clickedCoordVoibos
                             ? $t("additional:modules.tools.voibosTools.sun.locationActive")
                             : $t("additional:modules.tools.voibosTools.sun.pickLocationBtn")
@@ -377,7 +395,10 @@ export default {
                         :title="$t('additional:modules.tools.voibosTools.sun.recalculateBtn')"
                         @click="querySunService"
                     >
-                        <i class="bi bi-arrow-clockwise" aria-hidden="true" />
+                        <i
+                            class="bi bi-arrow-clockwise"
+                            aria-hidden="true"
+                        />
                     </button>
                 </div>
             </div>
@@ -389,7 +410,10 @@ export default {
             class="alert alert-info d-flex align-items-center mb-3 py-2 px-3 small"
             role="status"
         >
-            <i class="bi bi-cursor-fill me-2 fs-5" aria-hidden="true" />
+            <i
+                class="bi bi-cursor-fill me-2 fs-5"
+                aria-hidden="true"
+            />
             <div>{{ $t("additional:modules.tools.voibosTools.sun.activeHint") }}</div>
         </div>
 
@@ -398,7 +422,10 @@ export default {
             v-if="isLoading"
             class="d-flex flex-column align-items-center justify-content-center p-4 my-2"
         >
-            <div class="spinner-border text-primary mb-2" role="status">
+            <div
+                class="spinner-border text-primary mb-2"
+                role="status"
+            >
                 <span class="visually-hidden">Loading...</span>
             </div>
             <div class="text-muted small">
@@ -412,14 +439,20 @@ export default {
             class="alert alert-warning d-flex align-items-start mb-3"
             role="alert"
         >
-            <i class="bi bi-exclamation-triangle-fill me-2 mt-1 fs-5" aria-hidden="true" />
+            <i
+                class="bi bi-exclamation-triangle-fill me-2 mt-1 fs-5"
+                aria-hidden="true"
+            />
             <div class="small">
                 {{ errorMessage }}
             </div>
         </div>
 
         <!-- Result Display -->
-        <div v-if="sunResult && !isLoading" class="sun-result-container">
+        <div
+            v-if="sunResult && !isLoading"
+            class="sun-result-container"
+        >
             <!-- Sun Position Card (Azimuth & Elevation) -->
             <div class="card shadow-sm mb-3 border-0 bg-light">
                 <div class="card-body p-3">
@@ -463,14 +496,20 @@ export default {
                             v-if="sunResult.currentPosition?.isDirectSun"
                             class="alert alert-success d-flex align-items-center mb-0 py-1 px-2 small"
                         >
-                            <i class="bi bi-sun-fill text-warning fs-5 me-2" aria-hidden="true" />
+                            <i
+                                class="bi bi-sun-fill text-warning fs-5 me-2"
+                                aria-hidden="true"
+                            />
                             <strong>{{ $t("additional:modules.tools.voibosTools.sun.directSun") }}</strong>
                         </div>
                         <div
                             v-else-if="sunResult.currentPosition?.isAboveHorizon"
                             class="alert alert-warning d-flex align-items-center mb-0 py-1 px-2 small"
                         >
-                            <i class="bi bi-cloud-sun-fill fs-5 me-2" aria-hidden="true" />
+                            <i
+                                class="bi bi-cloud-sun-fill fs-5 me-2"
+                                aria-hidden="true"
+                            />
                             <div>
                                 <span>{{ $t("additional:modules.tools.voibosTools.sun.shaded") }}</span>
                                 <small class="d-block text-muted">
@@ -483,7 +522,10 @@ export default {
                             v-else
                             class="alert alert-secondary d-flex align-items-center mb-0 py-1 px-2 small"
                         >
-                            <i class="bi bi-moon-stars-fill fs-5 me-2" aria-hidden="true" />
+                            <i
+                                class="bi bi-moon-stars-fill fs-5 me-2"
+                                aria-hidden="true"
+                            />
                             <span>{{ $t("additional:modules.tools.voibosTools.sun.belowHorizon") }}</span>
                         </div>
                     </div>
@@ -494,7 +536,10 @@ export default {
             <div class="card shadow-sm mb-3 border-0">
                 <div class="card-body p-3">
                     <h6 class="card-title d-flex align-items-center mb-2 fs-6">
-                        <i class="bi bi-brightness-alt-high-fill me-2 text-warning" aria-hidden="true" />
+                        <i
+                            class="bi bi-brightness-alt-high-fill me-2 text-warning"
+                            aria-hidden="true"
+                        />
                         Tagesverlauf ({{ sunResult.timeZoneSuffix }})
                     </h6>
 
@@ -502,7 +547,10 @@ export default {
                         <!-- Sunrise -->
                         <div class="col-4">
                             <span class="text-muted small d-block">
-                                <i class="bi bi-sunrise text-warning me-1" aria-hidden="true" />
+                                <i
+                                    class="bi bi-sunrise text-warning me-1"
+                                    aria-hidden="true"
+                                />
                                 {{ $t("additional:modules.tools.voibosTools.sun.sunriseLabel") }}
                             </span>
                             <span class="fw-bold fs-6">
@@ -516,7 +564,10 @@ export default {
                         <!-- Solar Noon -->
                         <div class="col-4 border-start border-end">
                             <span class="text-muted small d-block">
-                                <i class="bi bi-sun text-warning me-1" aria-hidden="true" />
+                                <i
+                                    class="bi bi-sun text-warning me-1"
+                                    aria-hidden="true"
+                                />
                                 Höchststand
                             </span>
                             <span class="fw-bold fs-6">
@@ -530,7 +581,10 @@ export default {
                         <!-- Sunset -->
                         <div class="col-4">
                             <span class="text-muted small d-block">
-                                <i class="bi bi-sunset text-danger me-1" aria-hidden="true" />
+                                <i
+                                    class="bi bi-sunset text-danger me-1"
+                                    aria-hidden="true"
+                                />
                                 {{ $t("additional:modules.tools.voibosTools.sun.sunsetLabel") }}
                             </span>
                             <span class="fw-bold fs-6">
@@ -559,7 +613,10 @@ export default {
                             {{ formatNumber(clickedCoordVoibos?.[1], 2) }} m
                         </code>
                     </div>
-                    <div v-if="sunResult.altitudeInfo" class="d-flex justify-content-between">
+                    <div
+                        v-if="sunResult.altitudeInfo"
+                        class="d-flex justify-content-between"
+                    >
                         <span>Standorthöhe:</span>
                         <span class="fw-semibold text-dark">{{ sunResult.altitudeInfo }} m</span>
                     </div>
@@ -573,7 +630,10 @@ export default {
                     class="btn btn-outline-secondary btn-sm"
                     @click="reset"
                 >
-                    <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true" />
+                    <i
+                        class="bi bi-arrow-counterclockwise me-1"
+                        aria-hidden="true"
+                    />
                     {{ $t("additional:modules.tools.voibosTools.sun.reset") }}
                 </button>
             </div>
@@ -584,7 +644,10 @@ export default {
             v-if="!sunResult && !isLoading && !errorMessage"
             class="text-center text-muted p-4 my-3 border rounded bg-light"
         >
-            <i class="bi bi-sun fs-1 text-warning d-block mb-2" aria-hidden="true" />
+            <i
+                class="bi bi-sun fs-1 text-warning d-block mb-2"
+                aria-hidden="true"
+            />
             <p class="mb-0 small">
                 {{ $t("additional:modules.tools.voibosTools.sun.instruction") }}
             </p>

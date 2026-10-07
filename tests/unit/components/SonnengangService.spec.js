@@ -31,7 +31,7 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
             })
         };
 
-        sinon.stub(mapCollection, "getMap").callsFake(mode => (mode === "2D" ? mockMap : null));
+        sinon.stub(mapCollection, "getMap").callsFake(mode => mode === "2D" ? mockMap : null);
         fetchSunPositionStub = sinon.stub(voibosApi, "fetchSunPosition");
         transformStub = sinon.stub(coordinateService, "transform").callsFake((coord) => coord);
     });
@@ -134,6 +134,7 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
 
         // Marker created
         expect(wrapper.vm.vectorSource.getFeatures()).to.have.lengthOf(1);
+        expect(transformStub.calledOnce).to.be.true;
         expect(fetchSunPositionStub.calledOnce).to.be.true;
 
         // Result displayed

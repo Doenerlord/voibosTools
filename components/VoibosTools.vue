@@ -75,7 +75,10 @@ export default {
 </script>
 
 <template>
-    <div id="voibos-tools" class="voibos-tools-container">
+    <div
+        id="voibos-tools"
+        class="voibos-tools-container"
+    >
         <!-- Tab Navigation: [1. Höhe | 2. Sonnengang | 3. Profil | 4. Wegzeit] -->
         <ul
             id="voibos-tabs"
@@ -95,7 +98,10 @@ export default {
         </ul>
 
         <!-- Tab Panes -->
-        <div id="voibos-tab-content" class="tab-content flex-grow-1">
+        <div
+            id="voibos-tab-content"
+            class="tab-content flex-grow-1"
+        >
             <div
                 v-for="tab in tabs"
                 :id="`voibos-pane-${tab.id}`"
