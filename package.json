@@ -1,0 +1,7 @@
+{
+  "name": "voibosTools",
+  "version": "1.0.0",
+  "description": "Voibos Tools AddOn for Masterportal 3.26",
+  "main": "index.js",
+  "type": "module"
+}

@@ -1,0 +1,36 @@
+{
+  "modules": {
+    "tools": {
+      "voibosTools": {
+        "title": "Voibos Tools",
+        "description": "Voibos Geo Services (Elevation, Sun position, Profile, Travel time)",
+        "tabs": {
+          "elevation": "1. Elevation",
+          "sun": "2. Sun Position",
+          "profile": "3. Profile",
+          "routing": "4. Travel Time"
+        },
+        "elevation": {
+          "title": "Elevation Service",
+          "description": "Query point elevation above sea level by clicking on the map.",
+          "status": "Coming soon in Milestone 1"
+        },
+        "sun": {
+          "title": "Sun Position",
+          "description": "Analyze sun position (elevation, azimuth, sunrise and sunset) for date and time.",
+          "status": "Coming soon in Milestone 2"
+        },
+        "profile": {
+          "title": "Profile Service",
+          "description": "Generate terrain elevation profile along a drawn line.",
+          "status": "Coming soon in Milestone 3"
+        },
+        "routing": {
+          "title": "Travel Time Calculation",
+          "description": "Multi-point route, travel time and distance calculation for different travel modes.",
+          "status": "Coming soon in Milestone 4"
+        }
+      }
+    }
+  }
+}

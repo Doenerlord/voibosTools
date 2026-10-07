@@ -1,0 +1,36 @@
+{
+  "modules": {
+    "tools": {
+      "voibosTools": {
+        "title": "Voibos Tools",
+        "description": "Voibos Geodienste (Höhe, Sonnengang, Profil, Wegzeit)",
+        "tabs": {
+          "elevation": "1. Höhe",
+          "sun": "2. Sonnengang",
+          "profile": "3. Profil",
+          "routing": "4. Wegzeit"
+        },
+        "elevation": {
+          "title": "Höhenservice",
+          "description": "Punkthöhe über Adria (m ü. A.) durch Klick in die Karte abfragen.",
+          "status": "In Vorbereitung für Meilenstein 1"
+        },
+        "sun": {
+          "title": "Sonnengang",
+          "description": "Sonnenstandsanalyse (Höhe, Azimut, Auf- und Untergang) für Datum und Uhrzeit.",
+          "status": "In Vorbereitung für Meilenstein 2"
+        },
+        "profile": {
+          "title": "Profilservice",
+          "description": "Geländeschnitt entlang einer gezeichneten Linie erstellen.",
+          "status": "In Vorbereitung für Meilenstein 3"
+        },
+        "routing": {
+          "title": "Wegzeitberechnung",
+          "description": "Multi-Punkt-Routen-, Wegzeit- und Distanzberechnung für verschiedene Fortbewegungsarten.",
+          "status": "In Vorbereitung für Meilenstein 4"
+        }
+      }
+    }
+  }
+}
