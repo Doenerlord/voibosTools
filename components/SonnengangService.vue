@@ -40,7 +40,18 @@ export default {
             clickedCoordMap: null,
             clickedCoordVoibos: null,
             targetCrs: "EPSG:31287",
-            errorMessage: null
+            errorMessage: null,
+
+            // Graphics state (Voibos HTML charts)
+            graphics: {
+                panorama: null,
+                months: null,
+                distance: null
+            },
+            isLoadingGraphics: false,
+            activeGraphicTab: "panorama",
+            selectedModalImage: null,
+            selectedModalTitle: ""
         };
     },
     computed: {
@@ -57,6 +68,34 @@ export default {
                   julOffset = new Date(dateObj.getFullYear(), 6, 1).getTimezoneOffset();
 
             return dateObj.getTimezoneOffset() < Math.max(janOffset, julOffset);
+        },
+
+        /**
+         * Builds direct link to the Voibos web query page for the active selection.
+         * @returns {String|null} URL or null.
+         */
+        voibosWebUrl () {
+            if (!this.clickedCoordVoibos) {
+                return null;
+            }
+            return voibosApi.buildVoibosUrl("sonnengang", {
+                coordinate: this.clickedCoordVoibos,
+                date: this.selectedDate,
+                time: this.selectedTime,
+                crs: this.targetCrs
+            });
+        },
+
+        /**
+         * Checks if at least one graphic is available.
+         * @returns {Boolean} True if any graphic exists.
+         */
+        hasAnyGraphics () {
+            return Boolean(
+                this.graphics?.panorama ||
+                    this.graphics?.months ||
+                    this.graphics?.distance
+            );
         }
     },
     mounted () {
@@ -222,7 +261,7 @@ export default {
         },
 
         /**
-         * Queries Voibos sun position service for the current point and inputs.
+         * Queries Voibos sun position service and graphics for the current point and inputs.
          */
         async querySunService () {
             if (!this.clickedCoordVoibos) {
@@ -230,33 +269,48 @@ export default {
             }
 
             this.isLoading = true;
+            this.isLoadingGraphics = true;
             this.errorMessage = null;
 
-            try {
-                const response = await voibosApi.fetchSunPosition({
-                    coordinate: this.clickedCoordVoibos,
-                    date: this.selectedDate,
-                    time: this.selectedTime,
-                    crs: this.targetCrs
+            const queryParams = {
+                coordinate: this.clickedCoordVoibos,
+                date: this.selectedDate,
+                time: this.selectedTime,
+                crs: this.targetCrs
+            };
+
+            const sunPromise = voibosApi.fetchSunPosition(queryParams)
+                .then(response => {
+                    if (response?.abfragestatus && response.abfragestatus !== "erfolgreich") {
+                        this.errorMessage = response.abfragestatus;
+                    }
+
+                    this.sunResult = voibosApi.parseSunData(
+                        response,
+                        this.selectedTime,
+                        this.isDaylightSavingTime
+                    );
+                })
+                .catch(error => {
+                    this.errorMessage = error?.message || this.$t("additional:modules.tools.voibosTools.sun.errorGeneric");
+                    this.sunResult = null;
+                })
+                .finally(() => {
+                    this.isLoading = false;
                 });
 
-                if (response.abfragestatus && response.abfragestatus !== "erfolgreich") {
-                    this.errorMessage = response.abfragestatus;
-                }
+            const graphicsPromise = voibosApi.fetchSunGraphics(queryParams)
+                .then(graphics => {
+                    this.graphics = graphics || {panorama: null, months: null, distance: null};
+                })
+                .catch(() => {
+                    this.graphics = {panorama: null, months: null, distance: null};
+                })
+                .finally(() => {
+                    this.isLoadingGraphics = false;
+                });
 
-                this.sunResult = voibosApi.parseSunData(
-                    response,
-                    this.selectedTime,
-                    this.isDaylightSavingTime
-                );
-            }
-            catch (error) {
-                this.errorMessage = error.message || this.$t("additional:modules.tools.voibosTools.sun.errorGeneric");
-                this.sunResult = null;
-            }
-            finally {
-                this.isLoading = false;
-            }
+            await Promise.allSettled([sunPromise, graphicsPromise]);
         },
 
         /**
@@ -288,6 +342,10 @@ export default {
          */
         reset () {
             this.sunResult = null;
+            this.graphics = {panorama: null, months: null, distance: null};
+            this.isLoadingGraphics = false;
+            this.selectedModalImage = null;
+            this.selectedModalTitle = "";
             this.clickedCoordMap = null;
             this.clickedCoordVoibos = null;
             this.errorMessage = null;
@@ -295,6 +353,27 @@ export default {
             if (this.vectorSource) {
                 this.vectorSource.clear();
             }
+        },
+
+        /**
+         * Opens image in lightbox modal.
+         * @param {String} imageSrc Base64 image data URL.
+         * @param {String} title Image title.
+         */
+        openImageModal (imageSrc, title) {
+            if (!imageSrc) {
+                return;
+            }
+            this.selectedModalImage = imageSrc;
+            this.selectedModalTitle = title;
+        },
+
+        /**
+         * Closes lightbox modal.
+         */
+        closeImageModal () {
+            this.selectedModalImage = null;
+            this.selectedModalTitle = "";
         },
 
         /**
@@ -623,11 +702,210 @@ export default {
                 </div>
             </div>
 
-            <!-- Reset Button -->
-            <div class="d-grid mt-2">
+            <!-- Graphics and Diagrams Card -->
+            <div class="card shadow-sm mb-3 border-0 bg-light">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="card-title d-flex align-items-center m-0 fs-6">
+                            <i
+                                class="bi bi-graph-up me-2 text-primary"
+                                aria-hidden="true"
+                            />
+                            {{ $t("additional:modules.tools.voibosTools.sun.graphicsTitle") }}
+                        </h6>
+                        <span
+                            v-if="isLoadingGraphics"
+                            class="spinner-border spinner-border-sm text-primary"
+                            role="status"
+                            aria-hidden="true"
+                        />
+                    </div>
+
+                    <!-- Pill Selector for 3 graphics -->
+                    <div
+                        class="btn-group btn-group-sm w-100 mb-3"
+                        role="group"
+                        aria-label="Diagrammauswahl"
+                    >
+                        <button
+                            type="button"
+                            class="btn text-truncate"
+                            :class="activeGraphicTab === 'panorama' ? 'btn-primary' : 'btn-outline-primary'"
+                            @click="activeGraphicTab = 'panorama'"
+                        >
+                            {{ $t("additional:modules.tools.voibosTools.sun.graphicPanorama") }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn text-truncate"
+                            :class="activeGraphicTab === 'months' ? 'btn-primary' : 'btn-outline-primary'"
+                            @click="activeGraphicTab = 'months'"
+                        >
+                            {{ $t("additional:modules.tools.voibosTools.sun.graphicMonths") }}
+                        </button>
+                        <button
+                            type="button"
+                            class="btn text-truncate"
+                            :class="activeGraphicTab === 'distance' ? 'btn-primary' : 'btn-outline-primary'"
+                            @click="activeGraphicTab = 'distance'"
+                        >
+                            {{ $t("additional:modules.tools.voibosTools.sun.graphicDistance") }}
+                        </button>
+                    </div>
+
+                    <!-- Loading indicator for graphics -->
+                    <div
+                        v-if="isLoadingGraphics && !hasAnyGraphics"
+                        class="text-center py-3 text-muted small"
+                    >
+                        <div
+                            class="spinner-border spinner-border-sm text-primary mb-1"
+                            role="status"
+                        />
+                        <div>{{ $t("additional:modules.tools.voibosTools.sun.graphicsLoading") }}</div>
+                    </div>
+
+                    <!-- Active Graphic Container -->
+                    <div v-else>
+                        <!-- 1. Panorama / Horizont -->
+                        <div
+                            v-if="activeGraphicTab === 'panorama'"
+                            class="text-center"
+                        >
+                            <div
+                                v-if="graphics.panorama"
+                                class="position-relative graphic-wrapper"
+                            >
+                                <button
+                                    type="button"
+                                    class="btn p-0 border-0 bg-transparent w-100"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.panorama, $t('additional:modules.tools.voibosTools.sun.graphicPanorama'))"
+                                >
+                                    <img
+                                        :src="graphics.panorama"
+                                        :alt="$t('additional:modules.tools.voibosTools.sun.graphicPanorama')"
+                                        class="img-fluid rounded border bg-white shadow-sm voibos-graphic-preview"
+                                    >
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-light position-absolute top-0 end-0 m-1 p-1 shadow-sm opacity-75"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.panorama, $t('additional:modules.tools.voibosTools.sun.graphicPanorama'))"
+                                >
+                                    <i
+                                        class="bi bi-arrows-fullscreen small"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                            <div
+                                v-else-if="!isLoadingGraphics"
+                                class="text-muted small py-2"
+                            >
+                                {{ $t("additional:modules.tools.voibosTools.sun.graphicsError") }}
+                            </div>
+                        </div>
+
+                        <!-- 2. Months / Sonnenstunden -->
+                        <div
+                            v-if="activeGraphicTab === 'months'"
+                            class="text-center"
+                        >
+                            <div
+                                v-if="graphics.months"
+                                class="position-relative graphic-wrapper"
+                            >
+                                <button
+                                    type="button"
+                                    class="btn p-0 border-0 bg-transparent w-100"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.months, $t('additional:modules.tools.voibosTools.sun.graphicMonths'))"
+                                >
+                                    <img
+                                        :src="graphics.months"
+                                        :alt="$t('additional:modules.tools.voibosTools.sun.graphicMonths')"
+                                        class="img-fluid rounded border bg-white shadow-sm voibos-graphic-preview"
+                                    >
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-light position-absolute top-0 end-0 m-1 p-1 shadow-sm opacity-75"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.months, $t('additional:modules.tools.voibosTools.sun.graphicMonths'))"
+                                >
+                                    <i
+                                        class="bi bi-arrows-fullscreen small"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                            <div
+                                v-else-if="!isLoadingGraphics"
+                                class="text-muted small py-2"
+                            >
+                                {{ $t("additional:modules.tools.voibosTools.sun.graphicsError") }}
+                            </div>
+                        </div>
+
+                        <!-- 3. Distance / Horizont auf Karte -->
+                        <div
+                            v-if="activeGraphicTab === 'distance'"
+                            class="text-center"
+                        >
+                            <div
+                                v-if="graphics.distance"
+                                class="position-relative graphic-wrapper"
+                            >
+                                <button
+                                    type="button"
+                                    class="btn p-0 border-0 bg-transparent w-100"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.distance, $t('additional:modules.tools.voibosTools.sun.graphicDistance'))"
+                                >
+                                    <img
+                                        :src="graphics.distance"
+                                        :alt="$t('additional:modules.tools.voibosTools.sun.graphicDistance')"
+                                        class="img-fluid rounded border bg-white shadow-sm voibos-graphic-preview"
+                                    >
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-light position-absolute top-0 end-0 m-1 p-1 shadow-sm opacity-75"
+                                    :title="$t('additional:modules.tools.voibosTools.sun.clickToEnlarge')"
+                                    @click="openImageModal(graphics.distance, $t('additional:modules.tools.voibosTools.sun.graphicDistance'))"
+                                >
+                                    <i
+                                        class="bi bi-arrows-fullscreen small"
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
+                            <div
+                                v-else-if="!isLoadingGraphics"
+                                class="text-muted small py-2"
+                            >
+                                {{ $t("additional:modules.tools.voibosTools.sun.graphicsError") }}
+                            </div>
+                        </div>
+
+                        <div class="text-center text-muted small mt-2">
+                            <i
+                                class="bi bi-zoom-in me-1"
+                                aria-hidden="true"
+                            />
+                            <small>{{ $t("additional:modules.tools.voibosTools.sun.clickToEnlarge") }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Actions: Reset and Voibos External Link -->
+            <div class="d-flex gap-2 mt-2">
                 <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm"
+                    class="btn btn-outline-secondary btn-sm flex-fill"
                     @click="reset"
                 >
                     <i
@@ -636,6 +914,20 @@ export default {
                     />
                     {{ $t("additional:modules.tools.voibosTools.sun.reset") }}
                 </button>
+                <a
+                    v-if="voibosWebUrl"
+                    :href="voibosWebUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-outline-primary btn-sm flex-fill text-decoration-none d-flex align-items-center justify-content-center"
+                    :title="$t('additional:modules.tools.voibosTools.sun.openInVoibosTooltip')"
+                >
+                    <i
+                        class="bi bi-box-arrow-up-right me-1"
+                        aria-hidden="true"
+                    />
+                    <span>{{ $t("additional:modules.tools.voibosTools.sun.openInVoibosBtn") }}</span>
+                </a>
             </div>
         </div>
 
@@ -652,6 +944,49 @@ export default {
                 {{ $t("additional:modules.tools.voibosTools.sun.instruction") }}
             </p>
         </div>
+
+        <!-- Lightbox Modal for enlarged image view -->
+        <div
+            v-if="selectedModalImage"
+            class="voibos-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="voibos-modal-title"
+        >
+            <button
+                type="button"
+                class="voibos-modal-overlay-close"
+                tabindex="-1"
+                aria-hidden="true"
+                @click="closeImageModal"
+            />
+            <div class="voibos-modal-content">
+                <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
+                    <h6
+                        id="voibos-modal-title"
+                        class="m-0 fw-bold"
+                    >
+                        {{ selectedModalTitle }}
+                    </h6>
+                    <button
+                        type="button"
+                        class="btn-close"
+                        :aria-label="$t('additional:modules.tools.voibosTools.sun.closeModal')"
+                        @click="closeImageModal"
+                    />
+                </div>
+                <div
+                    class="p-3 text-center overflow-auto"
+                    style="max-height: 80vh;"
+                >
+                    <img
+                        :src="selectedModalImage"
+                        :alt="selectedModalTitle"
+                        class="img-fluid rounded shadow-sm"
+                    >
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -662,5 +997,57 @@ export default {
 
 .card {
     border-radius: 8px;
+}
+
+.graphic-wrapper {
+    overflow: hidden;
+}
+
+.voibos-graphic-preview {
+    max-height: 220px;
+    object-fit: contain;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15) !important;
+    }
+}
+
+.voibos-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.voibos-modal-content {
+    background: #ffffff;
+    border-radius: 10px;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+.voibos-modal-overlay-close {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    border: none;
+    cursor: default;
 }
 </style>

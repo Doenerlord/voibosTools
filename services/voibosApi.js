@@ -244,6 +244,166 @@ class VoibosApi {
     }
 
     /**
+     * Builds full web URL for a Voibos service endpoint (suitable for opening in a browser).
+     * @param {String} serviceName Service name (e.g. "sonnengang", "hoehenservice").
+     * @param {Object} [params={}] Service parameters.
+     * @returns {String} Complete URL.
+     */
+    buildVoibosUrl (serviceName, params = {}) {
+        let x, y;
+
+        if (Array.isArray(params.coordinate)) {
+            [x, y] = params.coordinate;
+        }
+        else {
+            x = params.x;
+            y = params.y;
+        }
+
+        const url = new URL(this.baseUrl);
+
+        url.searchParams.append("name", serviceName);
+
+        if (x !== undefined && y !== undefined) {
+            const formattedX = typeof x === "number" ? Number(x.toFixed(2)) : x,
+                formattedY = typeof y === "number" ? Number(y.toFixed(2)) : y;
+
+            url.searchParams.append("Koordinate", `${formattedX},${formattedY}`);
+        }
+
+        if (params.crs) {
+            url.searchParams.append("CRS", String(params.crs).replace(/^EPSG:/i, ""));
+        }
+
+        if (serviceName === "sonnengang") {
+            let dateObj;
+
+            if (params.date instanceof Date) {
+                dateObj = params.date;
+            }
+            else if (typeof params.date === "string" && params.date.length >= 10) {
+                const [year, month, day] = params.date.split("-").map(Number);
+
+                dateObj = new Date(year, month - 1, day);
+            }
+            else {
+                dateObj = new Date();
+            }
+
+            const month = String(dateObj.getMonth() + 1).padStart(2, "0"),
+                day = String(dateObj.getDate()).padStart(2, "0"),
+                timeStr = params.time || `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`,
+                voibosDatum = `${month}-${day}-${timeStr}`;
+
+            url.searchParams.append("Datum", voibosDatum);
+
+            if (params.height !== undefined && params.height !== null) {
+                url.searchParams.append("H", String(params.height));
+            }
+        }
+
+        return url.toString();
+    }
+
+    /**
+     * Extracts base64 PNG graphics from Voibos HTML response.
+     * @param {String} html Voibos response HTML string.
+     * @returns {Object} Object with panorama, months, distance data URLs or nulls.
+     */
+    extractSunGraphicsFromHtml (html) {
+        if (!html || typeof html !== "string") {
+            return {panorama: null, months: null, distance: null};
+        }
+
+        /**
+         * Extracts image data URL by tag ID.
+         * @param {String} id ID of the img tag.
+         * @returns {String|null} Clean base64 data URL or null.
+         */
+        function extract (id) {
+            const tagMatch = html.match(new RegExp(`<img[^>]*\\bid=["']${id}["'][^>]*>`, "i"));
+
+            if (!tagMatch) {
+                return null;
+            }
+
+            const srcMatch = tagMatch[0].match(/src=["']([^"']+)["']/i);
+
+            if (srcMatch && srcMatch[1].startsWith("data:image/png;base64,")) {
+                const clean = srcMatch[1].replace(/\r?\n/g, "");
+
+                return clean.length > 30 ? clean : null;
+            }
+
+            return null;
+        }
+
+        return {
+            panorama: extract("panorama"),
+            months: extract("months"),
+            distance: extract("distance")
+        };
+    }
+
+    /**
+     * Fetches graphic visualizations (panorama, months, distance) from Voibos.
+     * @param {Object} params Parameters for sun position service.
+     * @returns {Promise<Object>} Object containing panorama, months, distance base64 image strings.
+     */
+    async fetchSunGraphics (params = {}) {
+        let x, y;
+
+        if (Array.isArray(params.coordinate)) {
+            [x, y] = params.coordinate;
+        }
+        else {
+            x = params.x;
+            y = params.y;
+        }
+
+        if (x === undefined || y === undefined) {
+            throw new Error("VoibosApi.fetchSunGraphics: Coordinate (x, y) is required");
+        }
+
+        let dateObj;
+
+        if (params.date instanceof Date) {
+            dateObj = params.date;
+        }
+        else if (typeof params.date === "string" && params.date.length >= 10) {
+            const [year, month, day] = params.date.split("-").map(Number);
+
+            dateObj = new Date(year, month - 1, day);
+        }
+        else {
+            dateObj = new Date();
+        }
+
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0"),
+            day = String(dateObj.getDate()).padStart(2, "0"),
+            timeStr = params.time || `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`,
+            voibosDatum = `${month}-${day}-${timeStr}`,
+            formattedX = typeof x === "number" ? Number(x.toFixed(2)) : x,
+            formattedY = typeof y === "number" ? Number(y.toFixed(2)) : y,
+            crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
+            queryParams = {
+                name: "sonnengang",
+                Koordinate: `${formattedX},${formattedY}`,
+                CRS: crsCode,
+                Output: "Horizont,Sonnenzeit,Lage",
+                Datum: voibosDatum
+            };
+
+        if (params.height !== undefined && params.height !== null) {
+            queryParams.H = String(params.height);
+        }
+
+        const html = await this.get("", queryParams);
+
+        return this.extractSunGraphicsFromHtml(html);
+    }
+
+    /**
      * Parses Voibos sun position response for given time and date.
      * Computes sunrise, sunset, solar noon, and current sun position (azimuth, elevation, direct sun status).
      * @param {Object} response Voibos JSON response.

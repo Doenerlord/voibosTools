@@ -10,6 +10,7 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
     let mockMap,
         layersArray,
         fetchSunPositionStub,
+        fetchSunGraphicsStub,
         transformStub;
 
     beforeEach(() => {
@@ -33,6 +34,11 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
 
         sinon.stub(mapCollection, "getMap").callsFake(mode => mode === "2D" ? mockMap : null);
         fetchSunPositionStub = sinon.stub(voibosApi, "fetchSunPosition");
+        fetchSunGraphicsStub = sinon.stub(voibosApi, "fetchSunGraphics").resolves({
+            panorama: "data:image/png;base64,mockPanorama",
+            months: "data:image/png;base64,mockMonths",
+            distance: null
+        });
         transformStub = sinon.stub(coordinateService, "transform").callsFake((coord) => coord);
     });
 
@@ -136,6 +142,7 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
         expect(wrapper.vm.vectorSource.getFeatures()).to.have.lengthOf(1);
         expect(transformStub.calledOnce).to.be.true;
         expect(fetchSunPositionStub.calledOnce).to.be.true;
+        expect(fetchSunGraphicsStub.calledOnce).to.be.true;
 
         // Result displayed
         expect(wrapper.find(".sun-result-container").exists()).to.be.true;
@@ -228,5 +235,88 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
         expect(wrapper.vm.getCompassDirection(90)).to.equal("O");
         expect(wrapper.vm.getCompassDirection(180)).to.equal("S");
         expect(wrapper.vm.getCompassDirection(270)).to.equal("W");
+    });
+
+    it("computes voibosWebUrl and renders link to Voibos when coordinates are set", async () => {
+        fetchSunPositionStub.resolves({
+            abfragestatus: "erfolgreich",
+            horizont: []
+        });
+
+        const wrapper = mount(SonnengangService, {
+            global: {
+                mocks: {
+                    $t: key => key
+                }
+            }
+        });
+
+        expect(wrapper.vm.voibosWebUrl).to.be.null;
+
+        await wrapper.vm.handleMapClick({coordinate: [625919.53, 483187.24]});
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.voibosWebUrl).to.not.be.null;
+        expect(wrapper.vm.voibosWebUrl).to.include("name=sonnengang");
+        expect(wrapper.vm.voibosWebUrl).to.include("Koordinate=625919.53%2C483187.24");
+
+        const voibosLink = wrapper.find("a[href*='voibos']");
+
+        expect(voibosLink.exists()).to.be.true;
+        expect(voibosLink.attributes("target")).to.equal("_blank");
+    });
+
+    it("switches activeGraphicTab when buttons are clicked", async () => {
+        fetchSunPositionStub.resolves({
+            abfragestatus: "erfolgreich",
+            horizont: []
+        });
+
+        const wrapper = mount(SonnengangService, {
+            global: {
+                mocks: {
+                    $t: key => key
+                }
+            }
+        });
+
+        await wrapper.vm.handleMapClick({coordinate: [1000, 2000]});
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.activeGraphicTab).to.equal("panorama");
+
+        wrapper.vm.activeGraphicTab = "months";
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.activeGraphicTab).to.equal("months");
+
+        wrapper.vm.activeGraphicTab = "distance";
+        await wrapper.vm.$nextTick();
+        expect(wrapper.vm.activeGraphicTab).to.equal("distance");
+    });
+
+    it("opens and closes lightbox modal for graphics", async () => {
+        const wrapper = mount(SonnengangService, {
+            global: {
+                mocks: {
+                    $t: key => key
+                }
+            }
+        });
+
+        expect(wrapper.vm.selectedModalImage).to.be.null;
+        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.false;
+
+        wrapper.vm.openImageModal("data:image/png;base64,sample123", "Test Graphic");
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.selectedModalImage).to.equal("data:image/png;base64,sample123");
+        expect(wrapper.vm.selectedModalTitle).to.equal("Test Graphic");
+        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.true;
+
+        wrapper.vm.closeImageModal();
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.selectedModalImage).to.be.null;
+        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.false;
     });
 });

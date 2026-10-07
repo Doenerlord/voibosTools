@@ -255,4 +255,111 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(parsed.currentPosition.time).to.equal("12:00");
         });
     });
+
+    describe("buildVoibosUrl", () => {
+        it("constructs full Voibos URL with query params", () => {
+            const url = voibosApi.buildVoibosUrl("sonnengang", {
+                coordinate: [625919.53, 483187.24],
+                crs: "EPSG:31287",
+                date: "2026-06-21",
+                time: "14:30",
+                height: 2.0
+            });
+
+            expect(url).to.include("name=sonnengang");
+            expect(url).to.include("Koordinate=625919.53%2C483187.24");
+            expect(url).to.include("CRS=31287");
+            expect(url).to.include("Datum=06-21-14%3A30");
+            expect(url).to.include("H=2");
+        });
+
+        it("works with x and y properties", () => {
+            const url = voibosApi.buildVoibosUrl("hoehenservice", {
+                x: 100,
+                y: 200,
+                crs: "31287"
+            });
+
+            expect(url).to.include("name=hoehenservice");
+            expect(url).to.include("Koordinate=100%2C200");
+            expect(url).to.include("CRS=31287");
+        });
+    });
+
+    describe("extractSunGraphicsFromHtml", () => {
+        it("returns object with nulls for invalid input", () => {
+            expect(voibosApi.extractSunGraphicsFromHtml(null)).to.deep.equal({
+                panorama: null,
+                months: null,
+                distance: null
+            });
+            expect(voibosApi.extractSunGraphicsFromHtml("")).to.deep.equal({
+                panorama: null,
+                months: null,
+                distance: null
+            });
+        });
+
+        it("extracts panorama, months, and distance images from HTML", () => {
+            const fakeBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+            const html = `
+                <div>
+                    <img id="panorama" src="${fakeBase64}" />
+                    <img id="months" src="${fakeBase64}" />
+                    <img id="distance" src="${fakeBase64}" />
+                </div>
+            `;
+
+            const graphics = voibosApi.extractSunGraphicsFromHtml(html);
+
+            expect(graphics.panorama).to.equal(fakeBase64);
+            expect(graphics.months).to.equal(fakeBase64);
+            expect(graphics.distance).to.equal(fakeBase64);
+        });
+
+        it("cleans line breaks inside base64 strings", () => {
+            const base64WithNewlines = "data:image/png;base64,iVBORw0KGgoAAAANSU\nhEUgAAAAEAAAABCAYAAAA\nfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+            const html = `<img id="panorama" src="${base64WithNewlines}" />`;
+
+            const graphics = voibosApi.extractSunGraphicsFromHtml(html);
+
+            expect(graphics.panorama).to.not.include("\n");
+            expect(graphics.panorama).to.include("data:image/png;base64,");
+        });
+    });
+
+    describe("fetchSunGraphics", () => {
+        it("throws error when coordinate is missing", async () => {
+            try {
+                await voibosApi.fetchSunGraphics({});
+                expect.fail("Should have thrown error");
+            }
+            catch (error) {
+                expect(error.message).to.include("Coordinate (x, y) is required");
+            }
+        });
+
+        it("calls GET with Output=Horizont,Sonnenzeit,Lage and extracts graphics", async () => {
+            const fakeBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+            const mockHtml = `<img id="panorama" src="${fakeBase64}" /><img id="months" src="${fakeBase64}" />`;
+
+            requestStub.resolves(mockHtml);
+
+            const result = await voibosApi.fetchSunGraphics({
+                coordinate: [625919.53, 483187.24],
+                crs: "31287",
+                date: "2026-06-21",
+                time: "14:30"
+            });
+
+            expect(requestStub.calledOnce).to.be.true;
+
+            const config = requestStub.firstCall.args[1];
+
+            expect(config.params.Output).to.equal("Horizont,Sonnenzeit,Lage");
+            expect(result.panorama).to.equal(fakeBase64);
+            expect(result.months).to.equal(fakeBase64);
+            expect(result.distance).to.be.null;
+        });
+    });
 });
