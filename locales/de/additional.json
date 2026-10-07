@@ -13,7 +13,25 @@
         "elevation": {
           "title": "Höhenservice",
           "description": "Punkthöhe über Adria (m ü. A.) durch Klick in die Karte abfragen.",
-          "status": "In Vorbereitung für Meilenstein 1"
+          "instruction": "Klicken Sie auf einen Punkt in der Karte, um die Geländehöhe abzufragen.",
+          "activeHint": "Kartenabfrage aktiv: Klicken Sie an eine beliebige Stelle.",
+          "loading": "Höhendaten werden abgefragt...",
+          "dtmLabel": "Geländehöhe (DTM)",
+          "dsmLabel": "Oberflächenhöhe (DSM)",
+          "deltaHLabel": "Objekthöhe (Δh)",
+          "unit": "m ü. A.",
+          "coordinatesTitle": "Abfragekoordinaten",
+          "easting": "Rechtswert",
+          "northing": "Hochwert",
+          "crs": "Bezugssystem",
+          "metadataTitle": "Informationen zum Datensatz",
+          "datasource": "Datengrundlage",
+          "flightYear": "Befliegungsjahr",
+          "copyCoords": "Koordinaten kopieren",
+          "copied": "Kopiert!",
+          "reset": "Zurücksetzen",
+          "errorGeneric": "Fehler beim Abrufen der Höhendaten.",
+          "notInAustria": "Die ausgewählten Koordinaten liegen außerhalb des Datenbereichs (Österreich)."
         },
         "sun": {
           "title": "Sonnengang",

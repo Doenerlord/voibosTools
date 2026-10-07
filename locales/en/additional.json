@@ -13,7 +13,25 @@
         "elevation": {
           "title": "Elevation Service",
           "description": "Query point elevation above sea level by clicking on the map.",
-          "status": "Coming soon in Milestone 1"
+          "instruction": "Click a point on the map to query the terrain elevation.",
+          "activeHint": "Map query active: click anywhere on the map.",
+          "loading": "Querying elevation data...",
+          "dtmLabel": "Terrain Elevation (DTM)",
+          "dsmLabel": "Surface Elevation (DSM)",
+          "deltaHLabel": "Object Height (Δh)",
+          "unit": "m above sea level",
+          "coordinatesTitle": "Query Coordinates",
+          "easting": "Easting",
+          "northing": "Northing",
+          "crs": "Reference System",
+          "metadataTitle": "Dataset Information",
+          "datasource": "Data Source",
+          "flightYear": "Flight Year",
+          "copyCoords": "Copy Coordinates",
+          "copied": "Copied!",
+          "reset": "Reset",
+          "errorGeneric": "Error retrieving elevation data.",
+          "notInAustria": "The selected coordinates are outside the coverage area (Austria)."
         },
         "sun": {
           "title": "Sun Position",
