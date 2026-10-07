@@ -304,19 +304,20 @@ describe("addons/voibosTools/components/SonnengangService.vue", () => {
         });
 
         expect(wrapper.vm.selectedModalImage).to.be.null;
-        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.false;
+        expect(document.body.querySelector(".voibos-modal-backdrop")).to.be.null;
 
         wrapper.vm.openImageModal("data:image/png;base64,sample123", "Test Graphic");
         await wrapper.vm.$nextTick();
 
         expect(wrapper.vm.selectedModalImage).to.equal("data:image/png;base64,sample123");
         expect(wrapper.vm.selectedModalTitle).to.equal("Test Graphic");
-        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.true;
+        expect(document.body.querySelector(".voibos-modal-backdrop")).to.not.be.null;
 
-        wrapper.vm.closeImageModal();
+        // Closes on closeImageModal or Escape key
+        wrapper.vm.onModalKeyDown({key: "Escape"});
         await wrapper.vm.$nextTick();
 
         expect(wrapper.vm.selectedModalImage).to.be.null;
-        expect(wrapper.find(".voibos-modal-backdrop").exists()).to.be.false;
+        expect(document.body.querySelector(".voibos-modal-backdrop")).to.be.null;
     });
 });

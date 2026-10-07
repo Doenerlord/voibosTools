@@ -174,6 +174,10 @@ export default {
                 this.mapCheckInterval = null;
             }
 
+            if (this.selectedModalImage) {
+                this.closeImageModal();
+            }
+
             if (this.map) {
                 if (this.onMapClick) {
                     this.map.un("singleclick", this.onMapClick);
@@ -366,6 +370,7 @@ export default {
             }
             this.selectedModalImage = imageSrc;
             this.selectedModalTitle = title;
+            window.addEventListener("keydown", this.onModalKeyDown);
         },
 
         /**
@@ -374,6 +379,17 @@ export default {
         closeImageModal () {
             this.selectedModalImage = null;
             this.selectedModalTitle = "";
+            window.removeEventListener("keydown", this.onModalKeyDown);
+        },
+
+        /**
+         * Handles keydown event while modal is active.
+         * @param {KeyboardEvent} event Key event.
+         */
+        onModalKeyDown (event) {
+            if (event.key === "Escape") {
+                this.closeImageModal();
+            }
         },
 
         /**
@@ -945,48 +961,50 @@ export default {
             </p>
         </div>
 
-        <!-- Lightbox Modal for enlarged image view -->
-        <div
-            v-if="selectedModalImage"
-            class="voibos-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="voibos-modal-title"
-        >
-            <button
-                type="button"
-                class="voibos-modal-overlay-close"
-                tabindex="-1"
-                aria-hidden="true"
-                @click="closeImageModal"
-            />
-            <div class="voibos-modal-content">
-                <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
-                    <h6
-                        id="voibos-modal-title"
-                        class="m-0 fw-bold"
+        <!-- Lightbox Modal for enlarged image view (teleported to body to render above the map) -->
+        <teleport to="body">
+            <div
+                v-if="selectedModalImage"
+                class="voibos-modal-backdrop"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="voibos-modal-title"
+            >
+                <button
+                    type="button"
+                    class="voibos-modal-overlay-close"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click="closeImageModal"
+                />
+                <div class="voibos-modal-content">
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
+                        <h6
+                            id="voibos-modal-title"
+                            class="m-0 fw-bold"
+                        >
+                            {{ selectedModalTitle }}
+                        </h6>
+                        <button
+                            type="button"
+                            class="btn-close"
+                            :aria-label="$t('additional:modules.tools.voibosTools.sun.closeModal')"
+                            @click="closeImageModal"
+                        />
+                    </div>
+                    <div
+                        class="p-3 text-center overflow-auto"
+                        style="max-height: 80vh;"
                     >
-                        {{ selectedModalTitle }}
-                    </h6>
-                    <button
-                        type="button"
-                        class="btn-close"
-                        :aria-label="$t('additional:modules.tools.voibosTools.sun.closeModal')"
-                        @click="closeImageModal"
-                    />
-                </div>
-                <div
-                    class="p-3 text-center overflow-auto"
-                    style="max-height: 80vh;"
-                >
-                    <img
-                        :src="selectedModalImage"
-                        :alt="selectedModalTitle"
-                        class="img-fluid rounded shadow-sm"
-                    >
+                        <img
+                            :src="selectedModalImage"
+                            :alt="selectedModalTitle"
+                            class="img-fluid rounded shadow-sm"
+                        >
+                    </div>
                 </div>
             </div>
-        </div>
+        </teleport>
     </div>
 </template>
 
@@ -1019,10 +1037,12 @@ export default {
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
     width: 100vw;
     height: 100vh;
     background-color: rgba(0, 0, 0, 0.75);
-    z-index: 100000;
+    z-index: 999999;
     display: flex;
     align-items: center;
     justify-content: center;
