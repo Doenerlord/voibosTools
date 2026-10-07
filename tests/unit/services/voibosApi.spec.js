@@ -490,4 +490,143 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(data.flightYears).to.equal("2020");
         });
     });
+
+    describe("fetchTravelTime", () => {
+        it("throws an error when coordinates array has less than 2 coordinates", async () => {
+            try {
+                await voibosApi.fetchTravelTime({coordinates: [[1, 2]]});
+                expect.fail("Should have thrown error");
+            }
+            catch (error) {
+                expect(error.message).to.include("At least 2 coordinates");
+            }
+        });
+
+        it("calls GET with correct query parameters including LINESTRING WKT, CRS, Methode, and output", async () => {
+            const mockResponse = {
+                Abfragestatus: "erfolgreich",
+                Zusammenfassung: {}
+            };
+
+            requestStub.resolves(mockResponse);
+
+            const result = await voibosApi.fetchTravelTime({
+                coordinates: [
+                    [625919.53, 483187.24],
+                    [626500.10, 483200.20],
+                    [627000.12, 483250.34]
+                ],
+                crs: "EPSG:31287",
+                method: "SAC"
+            });
+
+            expect(requestStub.calledOnce).to.be.true;
+
+            const [endpoint, config] = requestStub.firstCall.args;
+
+            expect(endpoint).to.equal("");
+            expect(config.method).to.equal("GET");
+            expect(config.params).to.deep.equal({
+                name: "wegzeit",
+                Polygonzug: "LINESTRING(625919.53 483187.24, 626500.10 483200.20, 627000.12 483250.34)",
+                CRS: "31287",
+                Methode: "SAC",
+                output: "JSONDownload"
+            });
+            expect(result).to.deep.equal(mockResponse);
+        });
+    });
+
+    describe("parseTravelTimeData", () => {
+        it("returns null when response is invalid or missing Zusammenfassung", () => {
+            expect(voibosApi.parseTravelTimeData(null)).to.be.null;
+            expect(voibosApi.parseTravelTimeData({})).to.be.null;
+            expect(voibosApi.parseTravelTimeData({Abfragestatus: "fehlgeschlagen"})).to.be.null;
+        });
+
+        it("parses travel time summary, times, and segments", () => {
+            const mockResponse = {
+                Abfragestatus: "erfolgreich",
+                Zusammenfassung: {
+                    "Laenge 2D": 1999,
+                    "Laenge 3D": 2034,
+                    "Hoehenmeter Aufstieg": 57,
+                    "Hoehenmeter Abstieg": 70,
+                    Hoehendifferenz: -12,
+                    "Minimale Hoehe": 155,
+                    "Maximale Hoehe": 172,
+                    "Maximale Steigung": 12
+                },
+                "Gehzeiten (min)": {
+                    Berechnungsmethode: "DIN33466",
+                    "Gehzeit gesamt hin": 45,
+                    "Gehzeit gesamt zurueck": 40,
+                    "Gehzeit gesamt hin und zurueck": 85,
+                    "Marschzeit gesamt hin": 50,
+                    "Marschzeit gesamt zurueck": 45,
+                    "Marschzeit gesamt hin und zurueck": 95,
+                    "Gehzeit je Teilgeometrie": [
+                        {
+                            "Teilgeometrie-Nummer": 1,
+                            "Laenge inkl Lueckenschluss": 2034,
+                            "Hoehenmeter Aufstieg": 57,
+                            "Hoehenmeter Abstieg": 70,
+                            "Gehzeit hin": 45,
+                            "Gehzeit zurueck": 40,
+                            "Gehzeit gesamt": 85
+                        }
+                    ]
+                },
+                Datengrundlage: "Laserscanning 2025"
+            };
+
+            const data = voibosApi.parseTravelTimeData(mockResponse);
+
+            expect(data).to.not.be.null;
+            expect(data.status).to.equal("erfolgreich");
+            expect(data.distance2D).to.equal(1999);
+            expect(data.distance3D).to.equal(2034);
+            expect(data.ascent).to.equal(57);
+            expect(data.descent).to.equal(70);
+            expect(data.elevationDiff).to.equal(-12);
+            expect(data.minElevation).to.equal(155);
+            expect(data.maxElevation).to.equal(172);
+            expect(data.maxSlope).to.equal(12);
+            expect(data.method).to.equal("DIN33466");
+            expect(data.timeOneWay).to.equal(45);
+            expect(data.timeReturn).to.equal(40);
+            expect(data.timeRoundTrip).to.equal(85);
+            expect(data.marchingTimeOneWay).to.equal(50);
+            expect(data.segments).to.have.lengthOf(1);
+            expect(data.segments[0].timeOneWay).to.equal(45);
+            expect(data.dataSource).to.equal("Laserscanning 2025");
+        });
+
+        it("adjusts times when paceFactor is provided", () => {
+            const mockResponse = {
+                Abfragestatus: "erfolgreich",
+                Zusammenfassung: {
+                    "Laenge 2D": 1000,
+                    "Laenge 3D": 1000
+                },
+                "Gehzeiten (min)": {
+                    "Gehzeit gesamt hin": 60,
+                    "Gehzeit gesamt zurueck": 60,
+                    "Gehzeit gesamt hin und zurueck": 120
+                }
+            };
+
+            // Fast pace (1.2x factor -> time / 1.2 = 50 min)
+            const fastData = voibosApi.parseTravelTimeData(mockResponse, 1.2);
+
+            expect(fastData.timeOneWay).to.equal(50);
+            expect(fastData.timeRoundTrip).to.equal(100);
+
+            // Leisurely pace (0.8x factor -> time / 0.8 = 75 min)
+            const leisurelyData = voibosApi.parseTravelTimeData(mockResponse, 0.8);
+
+            expect(leisurelyData.timeOneWay).to.equal(75);
+            expect(leisurelyData.timeRoundTrip).to.equal(150);
+        });
+    });
 });

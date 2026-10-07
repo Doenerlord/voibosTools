@@ -660,10 +660,103 @@ class VoibosApi {
 
     /**
      * 4. Wegzeit (Multi-Punkt-Wegzeitberechnung)
-     * @returns {Promise<Object>} Response containing travel time details.
+     * @param {Object} params Parameters for travel time calculation.
+     * @param {Array<Array<Number>>} params.coordinates Array of coordinate pairs [[x, y], ...].
+     * @param {String} [params.method="DIN33466"] Calculation method ("DIN33466", "SAC", "VIIA").
+     * @param {String|Number} [params.crs="31287"] CRS EPSG code.
+     * @returns {Promise<Object>} Response containing travel time details, summary, and segments.
      */
-    async fetchTravelTime () {
-        throw new Error("VoibosApi.fetchTravelTime: Implementation planned for Milestone 4");
+    async fetchTravelTime (params = {}) {
+        if (!Array.isArray(params.coordinates) || params.coordinates.length < 2) {
+            throw new Error("VoibosApi.fetchTravelTime: At least 2 coordinates [[x, y], ...] are required");
+        }
+
+        const crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
+            method = params.method || "DIN33466",
+            wktPoints = params.coordinates.map(([ptX, ptY]) => {
+                const fx = typeof ptX === "number" ? ptX.toFixed(2) : ptX,
+                    fy = typeof ptY === "number" ? ptY.toFixed(2) : ptY;
+
+                return `${fx} ${fy}`;
+            }).join(", "),
+            wkt = `LINESTRING(${wktPoints})`,
+            queryParams = {
+                name: "wegzeit",
+                Polygonzug: wkt,
+                CRS: crsCode,
+                Methode: method,
+                output: "JSONDownload"
+            };
+
+        return this.get("", queryParams);
+    }
+
+    /**
+     * Parses travel time response and formats summary and segment statistics.
+     * @param {Object} response Travel time response from Voibos.
+     * @param {Number} [paceFactor=1.0] Optional speed factor multiplier (e.g. 0.8 for leisurely, 1.2 for fast).
+     * @returns {Object|null} Parsed travel time data or null.
+     */
+    parseTravelTimeData (response, paceFactor = 1.0) {
+        if (!response || response.Abfragestatus !== "erfolgreich" || !response.Zusammenfassung) {
+            return null;
+        }
+
+        const summary = response.Zusammenfassung,
+            times = response["Gehzeiten (min)"] || {},
+            factor = typeof paceFactor === "number" && paceFactor > 0 ? paceFactor : 1.0,
+            dist2D = typeof summary["Laenge 2D"] === "number" ? summary["Laenge 2D"] : Number(summary["Laenge 2D"] || 0),
+            dist3D = typeof summary["Laenge 3D"] === "number" ? summary["Laenge 3D"] : Number(summary["Laenge 3D"] || 0),
+            rawTimeOneWay = typeof times["Gehzeit gesamt hin"] === "number" ? times["Gehzeit gesamt hin"] : Number(times["Gehzeit gesamt hin"] || 0),
+            rawTimeReturn = typeof times["Gehzeit gesamt zurueck"] === "number" ? times["Gehzeit gesamt zurueck"] : Number(times["Gehzeit gesamt zurueck"] || 0),
+            rawTimeRoundTrip = typeof times["Gehzeit gesamt hin und zurueck"] === "number" ? times["Gehzeit gesamt hin und zurueck"] : Number(times["Gehzeit gesamt hin und zurueck"] || 0),
+            rawMarchingOneWay = typeof times["Marschzeit gesamt hin"] === "number" ? times["Marschzeit gesamt hin"] : Number(times["Marschzeit gesamt hin"] || 0),
+            rawMarchingReturn = typeof times["Marschzeit gesamt zurueck"] === "number" ? times["Marschzeit gesamt zurueck"] : Number(times["Marschzeit gesamt zurueck"] || 0),
+            rawMarchingRoundTrip = typeof times["Marschzeit gesamt hin und zurueck"] === "number" ? times["Marschzeit gesamt hin und zurueck"] : Number(times["Marschzeit gesamt hin und zurueck"] || 0),
+            rawSegments = Array.isArray(times["Gehzeit je Teilgeometrie"]) ? times["Gehzeit je Teilgeometrie"] : [],
+            segments = rawSegments.map((seg, idx) => ({
+                index: seg["Teilgeometrie-Nummer"] !== undefined ? seg["Teilgeometrie-Nummer"] : idx + 1,
+                distance: seg["Laenge inkl Lueckenschluss"] || seg["Laenge exkl Lueckenschluss"] || 0,
+                ascent: seg["Hoehenmeter Aufstieg"] || 0,
+                descent: seg["Hoehenmeter Abstieg"] || 0,
+                elevationDiff: seg["Hoehendifferenz "] || seg.Hoehendifferenz || 0,
+                minElevation: seg["minimale Hoehe "] || seg["minimale Hoehe"] || 0,
+                maxElevation: seg["maximale Hoehe "] || seg["maximale Hoehe"] || 0,
+                timeOneWay: Math.round((seg["Gehzeit hin"] || 0) / factor),
+                timeReturn: Math.round((seg["Gehzeit zurueck"] || 0) / factor),
+                timeTotal: Math.round((seg["Gehzeit gesamt"] || 0) / factor)
+            }));
+
+        return {
+            status: response.Abfragestatus,
+            distance2D: dist2D,
+            distance3D: dist3D,
+            ascent: summary["Hoehenmeter Aufstieg"] || 0,
+            descent: summary["Hoehenmeter Abstieg"] || 0,
+            elevationDiff: summary.Hoehendifferenz || 0,
+            minElevation: summary["Minimale Hoehe"] || 0,
+            maxElevation: summary["Maximale Hoehe"] || 0,
+            maxSlope: summary["Maximale Steigung"] || 0,
+            method: times.Berechnungsmethode || "DIN33466",
+            paceFactor: factor,
+            timeOneWay: Math.round(rawTimeOneWay / factor),
+            timeReturn: Math.round(rawTimeReturn / factor),
+            timeRoundTrip: Math.round(rawTimeRoundTrip / factor),
+            marchingTimeOneWay: Math.round(rawMarchingOneWay / factor),
+            marchingTimeReturn: Math.round(rawMarchingReturn / factor),
+            marchingTimeRoundTrip: Math.round(rawMarchingRoundTrip / factor),
+            rawTimes: {
+                timeOneWay: rawTimeOneWay,
+                timeReturn: rawTimeReturn,
+                timeRoundTrip: rawTimeRoundTrip,
+                marchingOneWay: rawMarchingOneWay,
+                marchingReturn: rawMarchingReturn,
+                marchingRoundTrip: rawMarchingRoundTrip
+            },
+            segments,
+            dataSource: response.Datengrundlage || null,
+            voibosVersion: response.Voibos || null
+        };
     }
 }
 
