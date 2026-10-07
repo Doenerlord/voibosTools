@@ -240,25 +240,4 @@ describe("addons/voibosTools/components/ProfilService.vue", () => {
         expect(wrapper.vm.drawnCoordsVoibos).to.deep.equal([]);
         expect(wrapper.vm.isDrawingActive).to.be.true;
     });
-
-    it("computes voibosWebUrl correctly when profile coordinates exist", async () => {
-        const wrapper = mount(ProfilService, {
-            global: {
-                mocks: {
-                    $t: key => key
-                }
-            }
-        });
-
-        expect(wrapper.vm.voibosWebUrl).to.be.null;
-
-        wrapper.vm.drawnCoordsVoibos = [
-            [625919.5, 483187.2],
-            [626000.1, 483250.3]
-        ];
-        await wrapper.vm.$nextTick();
-
-        expect(wrapper.vm.voibosWebUrl).to.include("name=profilservice");
-        expect(wrapper.vm.voibosWebUrl).to.include("Polygonzug=LINESTRING");
-    });
 });

@@ -45,20 +45,6 @@ export default {
         };
     },
     computed: {
-        /**
-         * Builds direct link to the Voibos web query page for the active profile line.
-         * @returns {String|null} URL or null.
-         */
-        voibosWebUrl () {
-            if (!this.drawnCoordsVoibos || this.drawnCoordsVoibos.length < 2) {
-                return null;
-            }
-            return voibosApi.buildVoibosUrl("profilservice", {
-                coordinates: this.drawnCoordsVoibos,
-                stepDistance: this.stepDistance,
-                crs: this.targetCrs
-            });
-        },
 
         /**
          * SVG plot padding configuration.
@@ -1036,11 +1022,11 @@ export default {
                 </div>
             </div>
 
-            <!-- Bottom Actions: Reset and Voibos External Link -->
-            <div class="d-flex gap-2 mt-2">
+            <!-- Bottom Actions: Reset -->
+            <div class="mt-2">
                 <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm flex-fill"
+                    class="btn btn-outline-secondary btn-sm w-100"
                     @click="reset"
                 >
                     <i
@@ -1049,20 +1035,6 @@ export default {
                     />
                     {{ $t("additional:modules.tools.voibosTools.profile.reset") }}
                 </button>
-                <a
-                    v-if="voibosWebUrl"
-                    :href="voibosWebUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn btn-outline-primary btn-sm flex-fill text-decoration-none d-flex align-items-center justify-content-center"
-                    :title="$t('additional:modules.tools.voibosTools.profile.openInVoibosTooltip')"
-                >
-                    <i
-                        class="bi bi-box-arrow-up-right me-1"
-                        aria-hidden="true"
-                    />
-                    <span>{{ $t("additional:modules.tools.voibosTools.profile.openInVoibosBtn") }}</span>
-                </a>
             </div>
         </div>
     </div>
