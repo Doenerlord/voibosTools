@@ -284,6 +284,24 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(url).to.include("Koordinate=100%2C200");
             expect(url).to.include("CRS=31287");
         });
+
+        it("constructs Voibos URL for profilservice with LINESTRING WKT", () => {
+            const url = voibosApi.buildVoibosUrl("profilservice", {
+                coordinates: [
+                    [625919.53, 483187.24],
+                    [626000.12, 483250.34]
+                ],
+                crs: "31287",
+                stepDistance: 15,
+                exaggeration: 2
+            });
+
+            expect(url).to.include("name=profilservice");
+            expect(url).to.include("Polygonzug=LINESTRING%28625919.53+483187.24%2C+626000.12+483250.34%29");
+            expect(url).to.include("Stuetzpunktabstand=15");
+            expect(url).to.include("Beschriftung=ja");
+            expect(url).to.include("Ueberhoehung=2");
+        });
     });
 
     describe("extractSunGraphicsFromHtml", () => {
@@ -360,6 +378,116 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(result.panorama).to.equal(fakeBase64);
             expect(result.months).to.equal(fakeBase64);
             expect(result.distance).to.be.null;
+        });
+    });
+
+    describe("fetchProfile", () => {
+        it("throws an error when coordinates array has less than 2 coordinates", async () => {
+            try {
+                await voibosApi.fetchProfile({coordinates: [[1, 2]]});
+                expect.fail("Should have thrown error");
+            }
+            catch (error) {
+                expect(error.message).to.include("At least 2 coordinates");
+            }
+        });
+
+        it("calls GET with correct query parameters including LINESTRING WKT and JSONDownload", async () => {
+            const mockResponse = {
+                abfragestatus: "erfolgreich",
+                stuetzpunkte: []
+            };
+
+            requestStub.resolves(mockResponse);
+
+            const result = await voibosApi.fetchProfile({
+                coordinates: [
+                    [625919.53, 483187.24],
+                    [626000.12, 483250.34]
+                ],
+                crs: "EPSG:31287",
+                stepDistance: 10,
+                exaggeration: 1
+            });
+
+            expect(requestStub.calledOnce).to.be.true;
+
+            const [endpoint, config] = requestStub.firstCall.args;
+
+            expect(endpoint).to.equal("");
+            expect(config.method).to.equal("GET");
+            expect(config.params).to.deep.equal({
+                name: "profilservice",
+                Polygonzug: "LINESTRING(625919.53 483187.24, 626000.12 483250.34)",
+                CRS: "31287",
+                Stuetzpunktabstand: "10",
+                Beschriftung: "ja",
+                Ueberhoehung: "1",
+                output: "JSONDownload"
+            });
+            expect(result).to.deep.equal(mockResponse);
+        });
+    });
+
+    describe("parseProfileData", () => {
+        it("returns null when response is invalid or missing stuetzpunkte", () => {
+            expect(voibosApi.parseProfileData(null)).to.be.null;
+            expect(voibosApi.parseProfileData({})).to.be.null;
+            expect(voibosApi.parseProfileData({stuetzpunkte: []})).to.be.null;
+        });
+
+        it("parses points and calculates distances, elevation stats, and gain/loss", () => {
+            const mockResponse = {
+                stuetzpunkte: [
+                    {
+                        stuetzpunktnummer: 0,
+                        "horizontale distanz": 0,
+                        rechtswert: 625919.53,
+                        hochwert: 483187.24,
+                        hoeheDTM: 200,
+                        hoeheDSM: 210,
+                        "hoehe sichtlinie": 200,
+                        flugjahr: 2020
+                    },
+                    {
+                        stuetzpunktnummer: 1,
+                        "horizontale distanz": 50,
+                        rechtswert: 625950.0,
+                        hochwert: 483200.0,
+                        hoeheDTM: 250,
+                        hoeheDSM: 255,
+                        "hoehe sichtlinie": 210,
+                        flugjahr: 2020
+                    },
+                    {
+                        stuetzpunktnummer: 2,
+                        "horizontale distanz": 100,
+                        rechtswert: 626000.0,
+                        hochwert: 483250.0,
+                        hoeheDTM: 220,
+                        hoeheDSM: 230,
+                        "hoehe sichtlinie": 220,
+                        flugjahr: 2020
+                    }
+                ],
+                datengrundlage: "ALS DTM/DSM",
+                flugjahre: "2020"
+            };
+
+            const data = voibosApi.parseProfileData(mockResponse);
+
+            expect(data).to.not.be.null;
+            expect(data.points).to.have.lengthOf(3);
+            expect(data.totalDistance).to.equal(100);
+            expect(data.minDtm).to.equal(200);
+            expect(data.maxDtm).to.equal(250);
+            expect(data.minDsm).to.equal(210);
+            expect(data.maxDsm).to.equal(255);
+            expect(data.elevationDifference).to.equal(50);
+            expect(data.elevationGain).to.equal(50);
+            expect(data.elevationLoss).to.equal(30);
+            expect(data.dataSource).to.equal("ALS DTM/DSM");
+            expect(data.flightYears).to.equal("2020");
         });
     });
 });

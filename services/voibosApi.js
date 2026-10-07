@@ -91,7 +91,10 @@ class VoibosApi {
                     errorDetails = errorJson.message || JSON.stringify(errorJson);
                 }
                 catch {
-                    errorDetails = await response.text();
+                    const errorText = await response.text(),
+                        match = errorText.match(/<p style="color:red">([\s\S]*?)<\/p>/i);
+
+                    errorDetails = match ? match[1].trim() : errorText;
                 }
 
                 throw new Error(
@@ -300,6 +303,19 @@ class VoibosApi {
             if (params.height !== undefined && params.height !== null) {
                 url.searchParams.append("H", String(params.height));
             }
+        }
+        else if (serviceName === "profilservice" && Array.isArray(params.coordinates) && params.coordinates.length >= 2) {
+            const wktPoints = params.coordinates.map(([ptX, ptY]) => {
+                const fx = typeof ptX === "number" ? ptX.toFixed(2) : ptX,
+                    fy = typeof ptY === "number" ? ptY.toFixed(2) : ptY;
+
+                return `${fx} ${fy}`;
+            }).join(", ");
+
+            url.searchParams.append("Polygonzug", `LINESTRING(${wktPoints})`);
+            url.searchParams.append("Stuetzpunktabstand", String(params.stepDistance || params.step || 10));
+            url.searchParams.append("Beschriftung", "ja");
+            url.searchParams.append("Ueberhoehung", String(params.exaggeration || 1));
         }
 
         return url.toString();
@@ -530,10 +546,116 @@ class VoibosApi {
 
     /**
      * 3. Profilservice (Höhenprofil)
-     * @returns {Promise<Object>} Response containing profile points.
+     * @param {Object} params Parameters for profile service.
+     * @param {Array<Array<Number>>} params.coordinates Array of coordinate pairs [[x, y], ...].
+     * @param {Number} [params.stepDistance=10] Sample point distance in meters (Stuetzpunktabstand).
+     * @param {Number} [params.exaggeration=1] Vertical exaggeration (Ueberhoehung).
+     * @param {String|Number} [params.crs="31287"] CRS EPSG code.
+     * @returns {Promise<Object>} Response containing stuetzpunkte array, etc.
      */
-    async fetchProfile () {
-        throw new Error("VoibosApi.fetchProfile: Implementation planned for Milestone 3");
+    async fetchProfile (params = {}) {
+        if (!Array.isArray(params.coordinates) || params.coordinates.length < 2) {
+            throw new Error("VoibosApi.fetchProfile: At least 2 coordinates [[x, y], ...] are required");
+        }
+
+        const crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
+            step = params.stepDistance || params.step || 10,
+            wktPoints = params.coordinates.map(([ptX, ptY]) => {
+                const fx = typeof ptX === "number" ? ptX.toFixed(2) : ptX,
+                    fy = typeof ptY === "number" ? ptY.toFixed(2) : ptY;
+
+                return `${fx} ${fy}`;
+            }).join(", "),
+            wkt = `LINESTRING(${wktPoints})`,
+            queryParams = {
+                name: "profilservice",
+                Polygonzug: wkt,
+                CRS: crsCode,
+                Stuetzpunktabstand: String(step),
+                Beschriftung: "ja",
+                Ueberhoehung: String(params.exaggeration || 1),
+                output: "JSONDownload"
+            };
+
+        return this.get("", queryParams);
+    }
+
+    /**
+     * Parses profile response and calculates statistics.
+     * @param {Object} response Profile response from Voibos.
+     * @returns {Object|null} Parsed profile statistics and points.
+     */
+    parseProfileData (response) {
+        if (!response || !Array.isArray(response.stuetzpunkte) || response.stuetzpunkte.length === 0) {
+            return null;
+        }
+
+        const points = response.stuetzpunkte.map(pt => ({
+            index: pt.stuetzpunktnummer,
+            distance: Number(pt["horizontale distanz"] ?? 0),
+            x: pt.rechtswert,
+            y: pt.hochwert,
+            dtm: typeof pt.hoeheDTM === "number" ? pt.hoeheDTM : Number(pt.hoeheDTM),
+            dsm: typeof pt.hoeheDSM === "number" ? pt.hoeheDSM : Number(pt.hoeheDSM),
+            lineOfSight: typeof pt["hoehe sichtlinie"] === "number" ? pt["hoehe sichtlinie"] : Number(pt["hoehe sichtlinie"]),
+            flightYear: pt.flugjahr
+        }));
+
+        let minDtm = Infinity,
+            maxDtm = -Infinity,
+            minDsm = Infinity,
+            maxDsm = -Infinity,
+            elevationGain = 0,
+            elevationLoss = 0;
+
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i];
+
+            if (!isNaN(p.dtm)) {
+                if (p.dtm < minDtm) {
+                    minDtm = p.dtm;
+                }
+                if (p.dtm > maxDtm) {
+                    maxDtm = p.dtm;
+                }
+
+                if (i > 0 && !isNaN(points[i - 1].dtm)) {
+                    const diff = p.dtm - points[i - 1].dtm;
+
+                    if (diff > 0) {
+                        elevationGain += diff;
+                    }
+                    else {
+                        elevationLoss += Math.abs(diff);
+                    }
+                }
+            }
+
+            if (!isNaN(p.dsm)) {
+                if (p.dsm < minDsm) {
+                    minDsm = p.dsm;
+                }
+                if (p.dsm > maxDsm) {
+                    maxDsm = p.dsm;
+                }
+            }
+        }
+
+        const totalDistance = points[points.length - 1].distance;
+
+        return {
+            points,
+            totalDistance: Math.round(totalDistance * 10) / 10,
+            minDtm: minDtm !== Infinity ? Math.round(minDtm * 10) / 10 : null,
+            maxDtm: maxDtm !== -Infinity ? Math.round(maxDtm * 10) / 10 : null,
+            minDsm: minDsm !== Infinity ? Math.round(minDsm * 10) / 10 : null,
+            maxDsm: maxDsm !== -Infinity ? Math.round(maxDsm * 10) / 10 : null,
+            elevationDifference: maxDtm !== -Infinity && minDtm !== Infinity ? Math.round((maxDtm - minDtm) * 10) / 10 : null,
+            elevationGain: Math.round(elevationGain * 10) / 10,
+            elevationLoss: Math.round(elevationLoss * 10) / 10,
+            dataSource: response.datengrundlage || null,
+            flightYears: response.flugjahre || null
+        };
     }
 
     /**
