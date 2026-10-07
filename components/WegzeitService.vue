@@ -25,6 +25,7 @@ export default {
             errorMessage: null,
             travelTimeData: null,
             targetCrs: "EPSG:31287",
+            waypointCounter: 1,
             map: null,
             vectorLayer: null,
             vectorSource: null,
@@ -155,8 +156,11 @@ export default {
                 return;
             }
 
+            const pointNumber = this.waypointCounter++;
+
             this.waypoints.push({
                 id: Date.now() + Math.random(),
+                name: this.$t("additional:modules.tools.voibosTools.routing.defaultPointName", {number: pointNumber}),
                 coordMap,
                 coordVoibos
             });
@@ -305,9 +309,26 @@ export default {
          */
         reset () {
             this.waypoints = [];
+            this.waypointCounter = 1;
             this.travelTimeData = null;
             this.errorMessage = null;
             this.updateMapFeatures();
+        },
+
+        /**
+         * Triggers Voibos PDF report download for current route.
+         */
+        downloadPdf () {
+            if (!this.hasEnoughPoints) {
+                return;
+            }
+            const coordinates = this.waypoints.map(w => w.coordVoibos);
+
+            voibosApi.downloadTravelTimePdf({
+                coordinates,
+                method: this.selectedMethod,
+                crs: this.targetCrs
+            });
         },
 
         /**
@@ -587,15 +608,19 @@ export default {
 
                         <!-- Label & Coordinates -->
                         <div class="text-truncate">
-                            <span class="fw-bold small d-block text-truncate">
-                                <span v-if="index === 0">
-                                    {{ $t('additional:modules.tools.voibosTools.routing.pointStart') }}
+                            <span class="fw-bold small d-flex align-items-center text-truncate">
+                                <span class="text-truncate">{{ wp.name }}</span>
+                                <span
+                                    v-if="index === 0"
+                                    class="badge bg-success ms-1"
+                                >
+                                    {{ $t('additional:modules.tools.voibosTools.routing.roleStart') }}
                                 </span>
-                                <span v-else-if="index === waypoints.length - 1 && waypoints.length > 1">
-                                    {{ $t('additional:modules.tools.voibosTools.routing.pointEnd') }}
-                                </span>
-                                <span v-else>
-                                    {{ $t('additional:modules.tools.voibosTools.routing.pointVia', {number: index + 1}) }}
+                                <span
+                                    v-else-if="index === waypoints.length - 1 && waypoints.length > 1"
+                                    class="badge bg-danger ms-1"
+                                >
+                                    {{ $t('additional:modules.tools.voibosTools.routing.roleEnd') }}
                                 </span>
                             </span>
                             <span class="text-muted text-truncate font-monospace extra-small">
@@ -648,35 +673,17 @@ export default {
                 </li>
             </ul>
 
-            <!-- Calculate Button Footer -->
+            <!-- Loading Indicator Footer -->
             <div
-                v-if="waypoints.length > 0"
-                class="card-footer bg-white p-2"
+                v-if="isLoading"
+                class="card-footer bg-white p-2 text-center text-primary small d-flex align-items-center justify-content-center"
             >
-                <button
-                    type="button"
-                    class="btn btn-primary btn-sm w-100 d-flex align-items-center justify-content-center"
-                    :disabled="!hasEnoughPoints || isLoading"
-                    @click="calculateTravelTime"
-                >
-                    <span
-                        v-if="isLoading"
-                        class="spinner-border spinner-border-sm me-2"
-                        role="status"
-                        aria-hidden="true"
-                    />
-                    <i
-                        v-else
-                        class="bi bi-calculator me-2"
-                        aria-hidden="true"
-                    />
-                    <span>
-                        {{ isLoading
-                            ? $t('additional:modules.tools.voibosTools.routing.calculating')
-                            : $t('additional:modules.tools.voibosTools.routing.calculateBtn')
-                        }}
-                    </span>
-                </button>
+                <span
+                    class="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                />
+                <span>{{ $t('additional:modules.tools.voibosTools.routing.calculating') }}</span>
             </div>
         </div>
 
@@ -854,6 +861,22 @@ export default {
                         </div>
                     </li>
                 </ul>
+            </div>
+
+            <!-- PDF Download Action Button -->
+            <div class="mb-3">
+                <button
+                    type="button"
+                    class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center shadow-sm"
+                    :title="$t('additional:modules.tools.voibosTools.routing.downloadPdfTooltip')"
+                    @click="downloadPdf"
+                >
+                    <i
+                        class="bi bi-file-earmark-pdf-fill me-2"
+                        aria-hidden="true"
+                    />
+                    <span>{{ $t('additional:modules.tools.voibosTools.routing.downloadPdf') }}</span>
+                </button>
             </div>
 
             <!-- Metadata Info Footer -->

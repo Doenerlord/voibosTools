@@ -147,7 +147,13 @@
           "emptyState": "Noch keine Wegpunkte erfasst. Klicken Sie auf die Karte, um den Startpunkt zu setzen.",
           "errorFewPoints": "Bitte erfassen Sie mindestens 2 Wegpunkte auf der Karte.",
           "errorGeneric": "Fehler bei der Berechnung der Wegzeit.",
-          "notInAustria": "Der Wegpunkt liegt außerhalb des Datenbereichs (Österreich)."
+          "notInAustria": "Der Wegpunkt liegt außerhalb des Datenbereichs (Österreich).",
+          "downloadPdf": "PDF-Bericht herunterladen",
+          "downloadPdfTooltip": "Detaillierten Wegzeit-Bericht als PDF herunterladen",
+          "roleStart": "Start",
+          "roleEnd": "Ziel",
+          "roleIntermediate": "Zwischenstopp",
+          "defaultPointName": "Wegpunkt {{number}}"
         }
       }
     }

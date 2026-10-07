@@ -147,7 +147,13 @@
           "emptyState": "No waypoints added yet. Click on the map to set the start point.",
           "errorFewPoints": "Please capture at least 2 waypoints on the map.",
           "errorGeneric": "Error calculating travel time.",
-          "notInAustria": "The waypoint is outside the coverage area (Austria)."
+          "notInAustria": "The waypoint is outside the coverage area (Austria).",
+          "downloadPdf": "Download PDF Report",
+          "downloadPdfTooltip": "Download detailed travel time report as PDF",
+          "roleStart": "Start",
+          "roleEnd": "Destination",
+          "roleIntermediate": "Waypoint",
+          "defaultPointName": "Waypoint {{number}}"
         }
       }
     }

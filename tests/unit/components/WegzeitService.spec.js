@@ -288,4 +288,56 @@ describe("addons/voibosTools/components/WegzeitService.vue", () => {
         expect(fetchTravelTimeStub.calledOnce).to.be.true;
         expect(fetchTravelTimeStub.firstCall.args[0].method).to.equal("SAC");
     });
+
+    it("maintains persistent waypoint name when reordered and updates roles", async () => {
+        const wrapper = mount(WegzeitService, {
+            global: {
+                mocks: {
+                    $t: (key, params) => params?.number ? `${key} ${params.number}` : key
+                }
+            }
+        });
+
+        wrapper.vm.waypoints = [
+            {id: 1, name: "Wegpunkt 1", coordMap: [100, 100], coordVoibos: [625919, 483187]},
+            {id: 2, name: "Wegpunkt 2", coordMap: [200, 200], coordVoibos: [626500, 483200]},
+            {id: 3, name: "Wegpunkt 3", coordMap: [300, 300], coordVoibos: [627000, 483250]}
+        ];
+        await wrapper.vm.$nextTick();
+
+        // Move Wegpunkt 3 up
+        await wrapper.vm.moveWaypointUp(2);
+        await wrapper.vm.$nextTick();
+
+        // Wegpunkt 3 is now at index 1, but its name is still "Wegpunkt 3"
+        expect(wrapper.vm.waypoints[1].name).to.equal("Wegpunkt 3");
+        expect(wrapper.vm.waypoints[2].name).to.equal("Wegpunkt 2");
+    });
+
+    it("calls voibosApi.downloadTravelTimePdf when downloadPdf is called", async () => {
+        const downloadStub = sinon.stub(voibosApi, "downloadTravelTimePdf");
+
+        const wrapper = mount(WegzeitService, {
+            global: {
+                mocks: {
+                    $t: key => key
+                }
+            }
+        });
+
+        wrapper.vm.waypoints = [
+            {id: 1, name: "Wegpunkt 1", coordMap: [100, 100], coordVoibos: [625919, 483187]},
+            {id: 2, name: "Wegpunkt 2", coordMap: [200, 200], coordVoibos: [626500, 483200]}
+        ];
+
+        wrapper.vm.downloadPdf();
+
+        expect(downloadStub.calledOnce).to.be.true;
+        expect(downloadStub.firstCall.args[0].coordinates).to.deep.equal([
+            [625919, 483187],
+            [626500, 483200]
+        ]);
+
+        downloadStub.restore();
+    });
 });

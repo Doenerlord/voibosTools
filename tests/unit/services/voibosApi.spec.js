@@ -629,4 +629,26 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(leisurelyData.timeRoundTrip).to.equal(150);
         });
     });
+
+    describe("downloadTravelTimePdf", () => {
+        it("throws an error when coordinates has fewer than 2 points", () => {
+            expect(() => voibosApi.downloadTravelTimePdf({coordinates: [[1, 2]]})).to.throw("At least 2 coordinates");
+        });
+
+        it("creates and submits a hidden form with POST to voibos", () => {
+            const formSubmitStub = sinon.stub(HTMLFormElement.prototype, "submit");
+
+            voibosApi.downloadTravelTimePdf({
+                coordinates: [
+                    [625919.53, 483187.24],
+                    [626000.12, 483250.34]
+                ],
+                crs: "31287",
+                method: "DIN33466"
+            });
+
+            expect(formSubmitStub.calledOnce).to.be.true;
+            formSubmitStub.restore();
+        });
+    });
 });

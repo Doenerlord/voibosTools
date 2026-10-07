@@ -758,6 +758,57 @@ class VoibosApi {
             voibosVersion: response.Voibos || null
         };
     }
+
+    /**
+     * Triggers PDF download for travel time calculation from Voibos via POST form.
+     * @param {Object} params Parameters for travel time calculation.
+     * @param {Array<Array<Number>>} params.coordinates Array of coordinate pairs [[x, y], ...].
+     * @param {String} [params.method="DIN33466"] Calculation method.
+     * @param {String|Number} [params.crs="31287"] CRS EPSG code.
+     * @returns {void}
+     */
+    downloadTravelTimePdf (params = {}) {
+        if (!Array.isArray(params.coordinates) || params.coordinates.length < 2) {
+            throw new Error("VoibosApi.downloadTravelTimePdf: At least 2 coordinates are required");
+        }
+
+        const crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
+            method = params.method || "DIN33466",
+            wktPoints = params.coordinates.map(([ptX, ptY]) => {
+                const fx = typeof ptX === "number" ? ptX.toFixed(2) : ptX,
+                    fy = typeof ptY === "number" ? ptY.toFixed(2) : ptY;
+
+                return `${fx} ${fy}`;
+            }).join(", "),
+            wkt = `LINESTRING(${wktPoints})`,
+            form = document.createElement("form"),
+            fields = {
+                name: "wegzeit",
+                crs: crsCode,
+                hintergrund: "geolandbasemap",
+                polygonzug: wkt,
+                output: "pdfdownload",
+                methode: method
+            };
+
+        form.method = "POST";
+        form.action = this.baseUrl;
+        form.target = "_blank";
+        form.style.display = "none";
+
+        Object.entries(fields).forEach(([key, val]) => {
+            const input = document.createElement("input");
+
+            input.type = "hidden";
+            input.name = key;
+            input.value = val;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
 }
 
 export const voibosApi = new VoibosApi();
