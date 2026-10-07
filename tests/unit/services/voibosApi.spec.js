@@ -67,4 +67,192 @@ describe("addons/voibosTools/services/voibosApi.js", () => {
             expect(config.params.CRS).to.equal("31256");
         });
     });
+
+    describe("fetchSunPosition", () => {
+        it("throws an error when coordinate is missing", async () => {
+            try {
+                await voibosApi.fetchSunPosition({});
+                expect.fail("Should have thrown an error");
+            }
+            catch (error) {
+                expect(error.message).to.include("Coordinate (x, y) is required");
+            }
+        });
+
+        it("calls GET with correct query parameters including formatted Datum and JSONDownload", async () => {
+            const mockResponse = {
+                abfragestatus: "erfolgreich",
+                horizont: []
+            };
+
+            requestStub.resolves(mockResponse);
+
+            const result = await voibosApi.fetchSunPosition({
+                coordinate: [625919.53, 483187.24],
+                crs: "EPSG:31287",
+                date: "2026-06-21",
+                time: "14:30",
+                height: 2.5
+            });
+
+            expect(requestStub.calledOnce).to.be.true;
+
+            const [endpoint, config] = requestStub.firstCall.args;
+
+            expect(endpoint).to.equal("");
+            expect(config.method).to.equal("GET");
+            expect(config.params).to.deep.equal({
+                name: "sonnengang",
+                Koordinate: "625919.53,483187.24",
+                CRS: "31287",
+                output: "JSONDownload",
+                Datum: "06-21-14:30",
+                H: "2.5"
+            });
+            expect(result).to.deep.equal(mockResponse);
+        });
+
+        it("accepts a Date object for date parameter", async () => {
+            requestStub.resolves({abfragestatus: "erfolgreich"});
+
+            const testDate = new Date(2026, 9, 7, 10, 15); // month 9 = October
+
+            await voibosApi.fetchSunPosition({
+                x: 100,
+                y: 200,
+                date: testDate,
+                time: "10:15"
+            });
+
+            const config = requestStub.firstCall.args[1];
+
+            expect(config.params.Datum).to.equal("10-07-10:15");
+        });
+    });
+
+    describe("parseSunData", () => {
+        it("returns null when response is invalid or missing horizont", () => {
+            expect(voibosApi.parseSunData(null)).to.be.null;
+            expect(voibosApi.parseSunData({})).to.be.null;
+            expect(voibosApi.parseSunData({horizont: "not-an-array"})).to.be.null;
+        });
+
+        it("parses sunrise, sunset, solar noon, and current sun position", () => {
+            const sampleResponse = {
+                abfragestatus: "erfolgreich",
+                datengrundlage: "DSM 2025",
+                flugjahr: "2023",
+                "sonnenstunden pro tag im monatsmittel": {
+                    Januar: 2.1,
+                    Juni: 9.8
+                },
+                horizont: [
+                    {
+                        azimuth: 60,
+                        hoehenwinkelAbfragedatum: "-5.0",
+                        hoehenwinkelDSM: "3.0",
+                        hoehenwinkelDTM: "1.0",
+                        UhrzeitSonnengangMESZ: "05:00",
+                        UhrzeitSonnengangMEZ: "04:00"
+                    },
+                    {
+                        azimuth: 90,
+                        hoehenwinkelAbfragedatum: "5.2",
+                        hoehenwinkelDSM: "3.5",
+                        hoehenwinkelDTM: "1.2",
+                        UhrzeitSonnengangMESZ: "06:15",
+                        UhrzeitSonnengangMEZ: "05:15"
+                    },
+                    {
+                        azimuth: 180,
+                        hoehenwinkelAbfragedatum: "62.4",
+                        hoehenwinkelDSM: "12.0",
+                        hoehenwinkelDTM: "2.5",
+                        UhrzeitSonnengangMESZ: "13:00",
+                        UhrzeitSonnengangMEZ: "12:00"
+                    },
+                    {
+                        azimuth: 270,
+                        hoehenwinkelAbfragedatum: "4.8",
+                        hoehenwinkelDSM: "8.0",
+                        hoehenwinkelDTM: "4.0",
+                        UhrzeitSonnengangMESZ: "20:45",
+                        UhrzeitSonnengangMEZ: "19:45"
+                    },
+                    {
+                        azimuth: 300,
+                        hoehenwinkelAbfragedatum: "-4.0",
+                        hoehenwinkelDSM: "2.0",
+                        hoehenwinkelDTM: "1.0",
+                        UhrzeitSonnengangMESZ: "21:30",
+                        UhrzeitSonnengangMEZ: "20:30"
+                    }
+                ]
+            };
+
+            const parsed = voibosApi.parseSunData(sampleResponse, "13:00", true);
+
+            expect(parsed).to.not.be.null;
+            expect(parsed.timeZoneSuffix).to.equal("MESZ");
+
+            // Sunrise & Sunset
+            expect(parsed.sunrise.time).to.equal("06:15");
+            expect(parsed.sunrise.azimuth).to.equal(90);
+            expect(parsed.sunset.time).to.equal("20:45");
+            expect(parsed.sunset.azimuth).to.equal(270);
+
+            // Solar Noon
+            expect(parsed.solarNoon.time).to.equal("13:00");
+            expect(parsed.solarNoon.maxElevation).to.equal(62.4);
+
+            // Current position at 13:00 (MESZ)
+            expect(parsed.currentPosition.azimuth).to.equal(180);
+            expect(parsed.currentPosition.elevation).to.equal(62.4);
+            expect(parsed.currentPosition.isAboveHorizon).to.be.true;
+            expect(parsed.currentPosition.isDirectSun).to.be.true; // 62.4 > 12.0 (DSM)
+        });
+
+        it("detects shade when elevation is below DSM horizon", () => {
+            const sampleResponse = {
+                abfragestatus: "erfolgreich",
+                horizont: [
+                    {
+                        azimuth: 270,
+                        hoehenwinkelAbfragedatum: "4.8",
+                        hoehenwinkelDSM: "8.0", // obstruction higher than sun elevation
+                        hoehenwinkelDTM: "2.0",
+                        UhrzeitSonnengangMESZ: "20:45",
+                        UhrzeitSonnengangMEZ: "19:45"
+                    }
+                ]
+            };
+
+            const parsed = voibosApi.parseSunData(sampleResponse, "20:45", true);
+
+            expect(parsed.currentPosition.isAboveHorizon).to.be.true;
+            expect(parsed.currentPosition.isDirectSun).to.be.false;
+        });
+
+        it("supports standard time (MEZ) mode", () => {
+            const sampleResponse = {
+                abfragestatus: "erfolgreich",
+                horizont: [
+                    {
+                        azimuth: 180,
+                        hoehenwinkelAbfragedatum: "25.0",
+                        hoehenwinkelDSM: "5.0",
+                        hoehenwinkelDTM: "2.0",
+                        UhrzeitSonnengangMESZ: "13:00",
+                        UhrzeitSonnengangMEZ: "12:00"
+                    }
+                ]
+            };
+
+            const parsed = voibosApi.parseSunData(sampleResponse, "12:00", false);
+
+            expect(parsed.timeZoneSuffix).to.equal("MEZ");
+            expect(parsed.solarNoon.time).to.equal("12:00");
+            expect(parsed.currentPosition.time).to.equal("12:00");
+        });
+    });
 });

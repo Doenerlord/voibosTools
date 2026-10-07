@@ -167,7 +167,6 @@ class VoibosApi {
             throw new Error("VoibosApi.fetchElevation: Coordinate (x, y) is required");
         }
 
-        // Format to 2 decimal places if number
         const formattedX = typeof x === "number" ? Number(x.toFixed(2)) : x,
             formattedY = typeof y === "number" ? Number(y.toFixed(2)) : y,
             crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
@@ -182,11 +181,187 @@ class VoibosApi {
 
     /**
      * 2. Sonnengang (Sonnenstand)
-     * @param {Object} _params Query parameters for sun position service.
-     * @returns {Promise<Object>}
+     * @param {Object} params Parameters for sun position service.
+     * @param {Array<Number>} [params.coordinate] [x, y] coordinate pair.
+     * @param {Number} [params.x] Easting / Rechtswert.
+     * @param {Number} [params.y] Northing / Hochwert.
+     * @param {String|Date} [params.date] Date string (YYYY-MM-DD) or Date object.
+     * @param {String} [params.time="12:00"] Time string (HH:mm).
+     * @param {Number} [params.height=2.0] Height above ground in meters.
+     * @param {String|Number} [params.crs="31287"] CRS EPSG code.
+     * @returns {Promise<Object>} Response containing horizont, sonnenstunden, etc.
      */
-    async fetchSunPosition (_params) {
-        throw new Error("VoibosApi.fetchSunPosition: Implementation planned for Milestone 2");
+    async fetchSunPosition (params = {}) {
+        let x, y;
+
+        if (Array.isArray(params.coordinate)) {
+            [x, y] = params.coordinate;
+        }
+        else {
+            x = params.x;
+            y = params.y;
+        }
+
+        if (x === undefined || y === undefined) {
+            throw new Error("VoibosApi.fetchSunPosition: Coordinate (x, y) is required");
+        }
+
+        let dateObj;
+
+        if (params.date instanceof Date) {
+            dateObj = params.date;
+        }
+        else if (typeof params.date === "string" && params.date.length >= 10) {
+            // YYYY-MM-DD
+            const [year, month, day] = params.date.split("-").map(Number);
+
+            dateObj = new Date(year, month - 1, day);
+        }
+        else {
+            dateObj = new Date();
+        }
+
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0"),
+            day = String(dateObj.getDate()).padStart(2, "0"),
+            timeStr = params.time || `${String(dateObj.getHours()).padStart(2, "0")}:${String(dateObj.getMinutes()).padStart(2, "0")}`,
+            voibosDatum = `${month}-${day}-${timeStr}`,
+            formattedX = typeof x === "number" ? Number(x.toFixed(2)) : x,
+            formattedY = typeof y === "number" ? Number(y.toFixed(2)) : y,
+            crsCode = String(params.crs || "31287").replace(/^EPSG:/i, ""),
+            queryParams = {
+                name: "sonnengang",
+                Koordinate: `${formattedX},${formattedY}`,
+                CRS: crsCode,
+                output: "JSONDownload",
+                Datum: voibosDatum
+            };
+
+        if (params.height !== undefined && params.height !== null) {
+            queryParams.H = String(params.height);
+        }
+
+        return this.get("", queryParams);
+    }
+
+    /**
+     * Parses Voibos sun position response for given time and date.
+     * Computes sunrise, sunset, solar noon, and current sun position (azimuth, elevation, direct sun status).
+     * @param {Object} response Voibos JSON response.
+     * @param {String} [targetTime="12:00"] Target time string (HH:mm).
+     * @param {Boolean} [isDST=true] True if Daylight Saving Time (MESZ), false for standard time (MEZ).
+     * @returns {Object} Parsed sun analysis results.
+     */
+    parseSunData (response, targetTime = "12:00", isDST = true) {
+        if (!response || !Array.isArray(response.horizont)) {
+            return null;
+        }
+
+        const timeKey = isDST ? "UhrzeitSonnengangMESZ" : "UhrzeitSonnengangMEZ",
+            timeZoneSuffix = isDST ? "MESZ" : "MEZ",
+            sunPath = response.horizont.filter(h => h.hoehenwinkelAbfragedatum !== "n/a"),
+            aboveHorizon = sunPath.filter(h => Number(h.hoehenwinkelAbfragedatum) > 0);
+
+        // Helper to convert "HH:mm" to minutes from midnight
+        const parseMinutes = (str) => {
+            if (!str || str === "n/a") {
+                return null;
+            }
+            const [h, m] = str.split(":").map(Number);
+
+            return isNaN(h) || isNaN(m) ? null : h * 60 + m;
+        };
+
+        const targetMinutes = parseMinutes(targetTime) ?? 12 * 60;
+
+        // Sunrise & Sunset
+        let sunrise = null,
+            sunset = null;
+
+        if (aboveHorizon.length > 0) {
+            const firstAbove = aboveHorizon[0],
+                lastAbove = aboveHorizon[aboveHorizon.length - 1];
+
+            sunrise = {
+                time: firstAbove[timeKey],
+                azimuth: firstAbove.azimuth,
+                elevation: Number(firstAbove.hoehenwinkelAbfragedatum)
+            };
+
+            sunset = {
+                time: lastAbove[timeKey],
+                azimuth: lastAbove.azimuth,
+                elevation: Number(lastAbove.hoehenwinkelAbfragedatum)
+            };
+        }
+
+        // Solar Noon (max elevation)
+        let solarNoon = null;
+
+        if (aboveHorizon.length > 0) {
+            const maxEntry = aboveHorizon.reduce(
+                (max, cur) => Number(cur.hoehenwinkelAbfragedatum) > Number(max.hoehenwinkelAbfragedatum) ? cur : max,
+                aboveHorizon[0]
+            );
+
+            solarNoon = {
+                time: maxEntry[timeKey],
+                azimuth: maxEntry.azimuth,
+                maxElevation: Number(maxEntry.hoehenwinkelAbfragedatum)
+            };
+        }
+
+        // Current Sun Position for target time
+        let currentPosition = null;
+
+        if (sunPath.length > 0) {
+            let closestEntry = null,
+                minDiff = Infinity;
+
+            for (const entry of sunPath) {
+                const entryMin = parseMinutes(entry[timeKey]);
+
+                if (entryMin !== null) {
+                    const diff = Math.abs(entryMin - targetMinutes);
+
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestEntry = entry;
+                    }
+                }
+            }
+
+            if (closestEntry) {
+                const elev = Number(closestEntry.hoehenwinkelAbfragedatum),
+                    dsm = Number(closestEntry.hoehenwinkelDSM),
+                    dtm = Number(closestEntry.hoehenwinkelDTM),
+                    isAboveHorizon = elev > 0,
+                    isDirectSun = isAboveHorizon && elev > dsm;
+
+                currentPosition = {
+                    azimuth: closestEntry.azimuth,
+                    elevation: elev,
+                    terrainHorizon: dtm,
+                    surfaceHorizon: dsm,
+                    isAboveHorizon,
+                    isDirectSun,
+                    time: closestEntry[timeKey],
+                    diffMinutes: minDiff
+                };
+            }
+        }
+
+        return {
+            status: response.abfragestatus || "erfolgreich",
+            timeZoneSuffix,
+            sunrise,
+            sunset,
+            solarNoon,
+            currentPosition,
+            monthlySunshine: response["sonnenstunden pro tag im monatsmittel"] || null,
+            altitudeInfo: response.abfragehoehe || null,
+            dataSource: response.datengrundlage || null,
+            flightYear: response.flugjahr || null
+        };
     }
 
     /**
